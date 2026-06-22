@@ -1,335 +1,258 @@
-import { useMemo, useEffect, useState } from 'react'
-import {
-  ArrowUpRight,
-  ArrowDownRight,
-  DollarSign,
-  Target,
-  TrendingUp,
-  Sparkles,
-  Activity,
-  Bot,
-  AlertCircle,
-} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Download, FileText, DollarSign, BarChart3, Landmark, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { Area, AreaChart, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
-import useFinanceStore from '@/stores/use-finance-store'
 import { useAuth } from '@/hooks/use-auth'
-import { getAcompanhamentos } from '@/services/db'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase/client'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-
-const fallbackCashFlowData = [
-  { day: '01', in: 4000, out: 2400 },
-  { day: '05', in: 3000, out: 1398 },
-  { day: '10', in: 2000, out: 9800 },
-  { day: '15', in: 2780, out: 3908 },
-  { day: '20', in: 1890, out: 4800 },
-  { day: '25', in: 2390, out: 3800 },
-  { day: '30', in: 3490, out: 4300 },
-]
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const { transactions } = useFinanceStore()
   const { toast } = useToast()
-  const [cashFlowData, setCashFlowData] = useState(fallbackCashFlowData)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [aiStatus, setAiStatus] = useState<'idle' | 'missing_key' | 'success'>('idle')
+  const [data, setData] = useState<any[]>([])
   const [stats, setStats] = useState({
-    saldo: 24500,
-    receitas: 45231.89,
-    despesas: 32100.5,
-    lucro: 13131.39,
+    ytdRevenue: 0,
+    avgResult: 0,
+    latestValuation: 0,
+    latestFaturamento: 0,
   })
 
   useEffect(() => {
     if (!user) return
-    getAcompanhamentos(user.id)
-      .then((data) => {
-        if (data && data.length > 0) {
-          const mapped = data.map((d: any, i: number) => ({
-            day: d.mes_referencia || `M${i + 1}`,
-            in: d.faturamento_realizado || 0,
-            out: (d.faturamento_realizado || 0) - (d.resultado_valor || 0),
-          }))
-          if (mapped.length > 0) setCashFlowData(mapped)
+    const fetchData = async () => {
+      const [{ data: acomp }, { data: vals }] = await Promise.all([
+        supabase
+          .from('acompanhamentos')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('mes_referencia', { ascending: true }),
+        supabase
+          .from('valuations')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('criado_em', { ascending: false })
+          .limit(1),
+      ])
 
-          const latest = data[data.length - 1]
-          setStats({
-            saldo: latest.resultado_valor || 24500,
-            receitas: latest.faturamento_realizado || 45231.89,
-            despesas:
-              (latest.faturamento_realizado || 0) - (latest.resultado_valor || 0) || 32100.5,
-            lucro: latest.resultado_valor || 13131.39,
-          })
-        }
+      let ytdRev = 0,
+        totalResult = 0,
+        count = 0,
+        lastFatur = 0
+      const mapped = (acomp || []).map((d: any, i: number) => {
+        const fatur = Number(d.faturamento_realizado) || 0
+        const result = Number(d.resultado_valor) || 0
+        ytdRev += fatur
+        totalResult += result
+        count++
+        lastFatur = fatur
+        return { mes: d.mes_referencia || `M${i + 1}`, faturamento: fatur, resultado: result }
       })
-      .catch(console.error)
+      if (mapped.length) setData(mapped)
+
+      setStats({
+        ytdRevenue: ytdRev,
+        avgResult: count > 0 ? totalResult / count : 0,
+        latestValuation: vals?.[0]?.resultado
+          ? Number((vals[0].resultado as any).valor_empresa) || 0
+          : 0,
+        latestFaturamento: lastFatur,
+      })
+    }
+    fetchData()
   }, [user])
 
-  const chartConfig = {
-    in: { label: 'Receitas', color: 'hsl(var(--primary))' },
-    out: { label: 'Despesas', color: 'hsl(var(--destructive))' },
-  }
-
-  const handleAiAnalysis = async () => {
+  const handleExportCSV = async () => {
     if (!user) return
-    setIsAnalyzing(true)
-    setAiStatus('idle')
     try {
-      const { data, error } = await supabase.functions.invoke('analyze-document', {
-        body: { documentText: 'Analisar finanças baseadas no fluxo de caixa recente.' },
-      })
+      const [{ data: diags }, { data: vals }] = await Promise.all([
+        supabase.from('diagnosticos').select('*').eq('user_id', user.id),
+        supabase.from('valuations').select('*').eq('user_id', user.id),
+      ])
+      let csv = 'Tipo,Data,Detalhes\n'
+      diags?.forEach(
+        (d) =>
+          (csv += `Diagnostico,${d.criado_em},"${JSON.stringify(d.dados).replace(/"/g, '""')}"\n`),
+      )
+      vals?.forEach(
+        (v) =>
+          (csv += `Valuation,${v.criado_em},"${JSON.stringify(v.resultado).replace(/"/g, '""')}"\n`),
+      )
 
-      if (error || !data || data?.error === 'AI_KEY_MISSING') {
-        setAiStatus('missing_key')
-        toast({
-          title: 'Configuração Pendente',
-          description: 'A chave da IA não está configurada.',
-          variant: 'destructive',
-        })
-        return
-      }
-
-      setAiStatus('success')
-      toast({
-        title: 'Análise Concluída',
-        description: 'Sua IA gerou um novo diagnóstico com sucesso!',
-      })
-
-      const { data: empData } = await supabase
-        .from('empresas')
-        .select('id')
-        .eq('user_id', user.id)
-        .limit(1)
-      let empId = empData?.[0]?.id
-
-      if (!empId) {
-        const { data: newEmp } = await supabase
-          .from('empresas')
-          .insert({
-            user_id: user.id,
-            nome_empresa: 'Minha Empresa (Gerada por IA)',
-          })
-          .select('id')
-          .single()
-        empId = newEmp?.id
-      }
-
-      if (empId) {
-        await supabase.from('diagnosticos').insert({
-          user_id: user.id,
-          empresa_id: empId,
-          dados: data.analysis.extracted_data || {},
-          plano_acao: data.analysis.plano_acao || {},
-        })
-      }
-    } catch (err: any) {
-      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
-    } finally {
-      setIsAnalyzing(false)
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+      link.download = 'relatorio_financeiro.csv'
+      link.click()
+      toast({ title: 'Sucesso', description: 'Download CSV iniciado.' })
+    } catch (e) {
+      toast({ title: 'Erro', description: 'Falha ao exportar CSV.', variant: 'destructive' })
     }
   }
 
-  return (
-    <div className="space-y-8 animate-slide-up">
-      {aiStatus === 'missing_key' && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>IA Indisponível</AlertTitle>
-          <AlertDescription>
-            A integração com a IA requer uma chave de API válida (ANTHROPIC_API_KEY). Configure suas
-            variáveis de ambiente para habilitar os diagnósticos automatizados.
-          </AlertDescription>
-        </Alert>
-      )}
+  const handleExportPDF = async () => {
+    if (!user) return
+    const { data: vals } = await supabase
+      .from('valuations')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('criado_em', { ascending: false })
+      .limit(1)
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(`<html><head><title>Relatório PDF</title></head>
+    <body style="font-family:sans-serif;padding:40px;color:#333;">
+      <h1 style="color:#0f172a;">MentorFinance - Relatório Estratégico</h1>
+      <hr style="border:1px solid #e2e8f0;margin-bottom:20px;" />
+      <p><strong>Data da Exportação:</strong> ${new Date().toLocaleDateString()}</p>
+      <h2 style="margin-top:30px;color:#334155;">Último Valuation</h2>
+      <div style="background:#f8fafc;padding:20px;border-radius:8px;border:1px solid #e2e8f0;">
+        <pre style="margin:0;font-size:14px;white-space:pre-wrap;">${JSON.stringify(vals?.[0]?.resultado || { status: 'Nenhum valuation encontrado' }, null, 2)}</pre>
+      </div>
+    </body></html>`)
+    win.document.close()
+    setTimeout(() => {
+      win.print()
+      win.close()
+    }, 500)
+    toast({ title: 'Sucesso', description: 'Preparando impressão PDF.' })
+  }
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  return (
+    <div className="space-y-8 p-4 md:p-8 animate-slide-up max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard de Resultados</h1>
           <p className="text-muted-foreground mt-1">
-            Acompanhe seus indicadores, receitas, despesas e fluxo de caixa.
+            Acompanhe seus indicadores e exporte seus relatórios.
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            onClick={handleAiAnalysis}
-            disabled={isAnalyzing}
-            className="shrink-0 rounded-full shadow-subtle active:scale-95 transition-transform"
-          >
-            <Bot className="mr-2 h-4 w-4" />
-            {isAnalyzing ? 'Analisando...' : 'Gerar Diagnóstico IA'}
+          <Button variant="outline" onClick={handleExportCSV} className="shadow-sm">
+            <Download className="mr-2 h-4 w-4" /> Exportar CSV
           </Button>
-          <Button className="shrink-0 rounded-full shadow-subtle active:scale-95 transition-transform">
-            Adicionar Transação
+          <Button variant="outline" onClick={handleExportPDF} className="shadow-sm">
+            <FileText className="mr-2 h-4 w-4" /> Exportar PDF
           </Button>
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-subtle border-none">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <Card className="shadow-sm border-border/50">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Saldo Atual (Caixa)
+              Total Revenue (YTD)
             </CardTitle>
-            <DollarSign className="h-4 w-4 text-primary" />
+            <DollarSign className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {stats.ytdRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
-            <p className="text-xs text-muted-foreground flex items-center mt-1">
-              <TrendingUp className="h-3 w-3 mr-1 text-primary" />
-              <span className="text-primary font-medium">+12%</span> em relação ao mês anterior
-            </p>
           </CardContent>
         </Card>
-        <Card className="shadow-subtle border-none">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <Card className="shadow-sm border-border/50">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Receitas do Mês
+              Average Monthly Result
             </CardTitle>
-            <ArrowUpRight className="h-4 w-4 text-primary" />
+            <BarChart3 className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats.receitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {stats.avgResult.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
-            <p className="text-xs text-muted-foreground flex items-center mt-1">
-              Rumo à meta de R$ 50k
-            </p>
-            <Progress value={90} className="h-1.5 mt-3" />
           </CardContent>
         </Card>
-        <Card className="shadow-subtle border-none">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <Card className="shadow-sm border-border/50">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Despesas do Mês
+              Latest Valuation
             </CardTitle>
-            <ArrowDownRight className="h-4 w-4 text-destructive" />
+            <Landmark className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {stats.despesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {stats.latestValuation.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+              })}
             </div>
-            <p className="text-xs text-muted-foreground flex items-center mt-1">
-              <Activity className="h-3 w-3 mr-1 text-destructive" />
-              <span className="text-destructive font-medium">+4%</span> vs. orçado
-            </p>
           </CardContent>
         </Card>
-        <Card className="shadow-subtle border-none">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <Card className="shadow-sm border-border/50">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Lucro / Prejuízo
+              Último Faturamento
             </CardTitle>
-            <Target className="h-4 w-4 text-secondary" />
+            <TrendingUp className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {stats.lucro.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            <div className="text-2xl font-bold">
+              {stats.latestFaturamento.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+              })}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Margem de lucro atual: 29%</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-7">
-        <Card className="md:col-span-4 shadow-subtle border-none">
-          <CardHeader>
-            <CardTitle>Fluxo de Caixa (30 dias)</CardTitle>
-            <CardDescription>Evolução de entradas e saídas diárias</CardDescription>
-          </CardHeader>
-          <CardContent className="px-2">
-            <div className="h-[300px] w-full mt-4">
-              <ChartContainer config={chartConfig} className="h-full w-full">
-                <AreaChart data={cashFlowData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorIn" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-in)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--color-in)" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-out)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--color-out)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis
-                    dataKey="day"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                    tickFormatter={(val) => `R$ ${val / 1000}k`}
-                  />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Area
-                    type="monotone"
-                    dataKey="in"
-                    stroke="var(--color-in)"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#colorIn)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="out"
-                    stroke="var(--color-out)"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#colorOut)"
-                  />
-                </AreaChart>
-              </ChartContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="md:col-span-3 space-y-6">
-          <Card className="shadow-subtle border-none bg-accent/50 h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Sparkles className="h-5 w-5 text-primary" />
-                Dicas da IA para hoje
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-background rounded-xl p-4 shadow-sm border border-border/50 hover:border-primary/30 transition-colors">
-                <h4 className="font-medium text-sm flex items-center gap-2 mb-1">
-                  <Activity className="h-4 w-4 text-secondary" />
-                  Alerta de Custos
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  Sua conta de energia elétrica subiu 15% este mês. Que tal revisar os horários de
-                  uso de equipamentos pesados?
-                </p>
-              </div>
-              <div className="bg-background rounded-xl p-4 shadow-sm border border-border/50 hover:border-primary/30 transition-colors">
-                <h4 className="font-medium text-sm flex items-center gap-2 mb-1">
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                  Oportunidade de Caixa
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  Você tem R$ 8.200 em contas a receber nos próximos 5 dias. Ideal para cobrir as
-                  despesas fixas desta semana sem usar capital de giro.
-                </p>
-              </div>
-              <Button variant="outline" className="w-full mt-2 rounded-full shadow-sm" asChild>
-                <a href="/plano">Ver todas recomendações</a>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <Card className="shadow-sm border-border/50">
+        <CardHeader>
+          <CardTitle>Evolução Financeira</CardTitle>
+          <CardDescription>Faturamento Realizado e Resultado ao longo do tempo</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[350px] w-full mt-4">
+            <ChartContainer
+              config={{
+                faturamento: { label: 'Faturamento', color: 'hsl(var(--primary))' },
+                resultado: { label: 'Resultado', color: 'hsl(var(--secondary))' },
+              }}
+              className="h-full w-full"
+            >
+              <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="hsl(var(--border))"
+                  opacity={0.5}
+                />
+                <XAxis
+                  dataKey="mes"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis
+                  tickFormatter={(v) => `R$ ${v / 1000}k`}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Area
+                  type="monotone"
+                  dataKey="faturamento"
+                  stroke="var(--color-faturamento)"
+                  fill="var(--color-faturamento)"
+                  fillOpacity={0.15}
+                  strokeWidth={3}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="resultado"
+                  stroke="var(--color-resultado)"
+                  fill="var(--color-resultado)"
+                  fillOpacity={0.15}
+                  strokeWidth={3}
+                />
+              </AreaChart>
+            </ChartContainer>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
