@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import Diagnostico from './pages/Diagnostico'
 import PlanoAcao from './pages/PlanoAcao'
 import Organizacao from './pages/Organizacao'
+import Advisor from './pages/Advisor'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import { FinanceProvider } from './stores/use-finance-store'
@@ -70,6 +71,7 @@ const App = () => (
                 <Route path="/diagnostico" element={<Diagnostico />} />
                 <Route path="/plano" element={<PlanoAcao />} />
                 <Route path="/organizacao" element={<Organizacao />} />
+                <Route path="/advisor" element={<Advisor />} />
 
                 <Route path="/privacidade" element={<Privacidade />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />

@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Briefcase, Settings, ShieldCheck, Moon, Sun, LogOut } from 'lucide-react'
+import { Briefcase, Settings, ShieldCheck, Moon, Sun, LogOut, Shield } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -50,6 +50,13 @@ export default function Layout() {
               className={`hover:text-primary transition-colors ${location.pathname === '/plano' ? 'text-primary' : 'text-muted-foreground'}`}
             >
               Plano de Ação
+            </Link>
+            <Link
+              to="/advisor"
+              className={`flex items-center gap-1.5 hover:text-primary transition-colors ${location.pathname === '/advisor' ? 'text-primary' : 'text-muted-foreground'}`}
+            >
+              <Shield className="h-4 w-4" />
+              Advisor
             </Link>
             <div className="h-4 w-px bg-border mx-2" />
             <button

@@ -203,6 +203,41 @@ export type Database = {
         }
         Relationships: []
       }
+      relatorios: {
+        Row: {
+          conteudo: string
+          criado_em: string
+          empresa_id: string | null
+          id: string
+          mes_referencia: string
+          user_id: string
+        }
+        Insert: {
+          conteudo: string
+          criado_em?: string
+          empresa_id?: string | null
+          id?: string
+          mes_referencia: string
+          user_id: string
+        }
+        Update: {
+          conteudo?: string
+          criado_em?: string
+          empresa_id?: string | null
+          id?: string
+          mes_referencia?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'relatorios_empresa_id_fkey'
+            columns: ['empresa_id']
+            isOneToOne: false
+            referencedRelation: 'empresas'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       valuations: {
         Row: {
           criado_em: string | null
