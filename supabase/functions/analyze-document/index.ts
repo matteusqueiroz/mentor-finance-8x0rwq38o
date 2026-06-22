@@ -1,5 +1,5 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import { corsHeaders } from '../_shared/cors.ts'
+import { corsHeaders } from '../__shared/cors.ts'
 import { encodeBase64 } from 'jsr:@std/encoding/base64'
 
 Deno.serve(async (req: Request) => {
