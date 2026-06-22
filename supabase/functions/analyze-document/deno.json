@@ -1,5 +1,6 @@
 {
   "imports": {
-    "openai": "npm:openai@4"
+    "openai": "npm:openai@4",
+    "@_shared/": "../_shared/"
   }
 }
