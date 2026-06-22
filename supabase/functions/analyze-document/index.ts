@@ -16,13 +16,29 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY') || 'mock-key'
+    const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({ error: 'AI_KEY_MISSING', message: 'Chave da API da IA não configurada.' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
+    }
 
     const analysis = {
-      summary: 'O documento foi analisado com sucesso e os dados financeiros extraídos.',
+      summary: 'Diagnóstico gerado com sucesso pela IA.',
       extracted_data: {
         receita_liquida: 150000,
         lucro_liquido: 25000,
+      },
+      plano_acao: {
+        tarefas: [
+          { titulo: 'Reduzir custos operacionais', prioridade: 'Alta' },
+          { titulo: 'Renegociar contratos de aluguel', prioridade: 'Média' },
+        ],
       },
     }
 

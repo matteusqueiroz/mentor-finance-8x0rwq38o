@@ -20,6 +20,8 @@ import TemplateFlow from './pages/onboarding/Template'
 import Privacidade from './pages/Privacidade'
 import Configuracoes from './pages/Configuracoes'
 import Login from './pages/Login'
+import Register from './pages/Register'
+import ForgotPassword from './pages/ForgotPassword'
 import { AuthProvider, useAuth } from './hooks/use-auth'
 import { Navigate, useLocation } from 'react-router-dom'
 
@@ -48,6 +50,8 @@ const App = () => (
             <Sonner />
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route
                 element={
                   <ProtectedRoute>

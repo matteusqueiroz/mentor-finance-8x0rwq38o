@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Card,
   CardContent,
@@ -15,24 +14,34 @@ import {
 } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 
-export default function Login() {
+export default function Register() {
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const { signIn } = useAuth()
+  const { signUp } = useAuth()
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (password.length < 8) {
+      toast({
+        title: 'Erro',
+        description: 'A senha deve ter no mínimo 8 caracteres.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setIsLoading(true)
-    const { error } = await signIn(email, password)
+    const { error } = await signUp(email, password, name)
     setIsLoading(false)
 
     if (error) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+      toast({ title: 'Erro ao registrar', description: error.message, variant: 'destructive' })
     } else {
+      toast({ title: 'Conta criada!', description: 'Bem-vindo ao Mentor Finance.' })
       navigate('/dashboard')
     }
   }
@@ -41,11 +50,21 @@ export default function Login() {
     <div className="flex items-center justify-center min-h-screen p-4 bg-background">
       <Card className="w-full max-w-md shadow-lg border-none animate-fade-in-up">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold tracking-tight">Entrar na sua conta</CardTitle>
-          <CardDescription>Insira seu e-mail e senha para acessar o painel.</CardDescription>
+          <CardTitle className="text-2xl font-bold tracking-tight">Criar uma conta</CardTitle>
+          <CardDescription>Insira seus dados abaixo para se cadastrar.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleRegister} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome completo</Label>
+              <Input
+                id="name"
+                placeholder="Seu nome"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
               <Input
@@ -58,47 +77,26 @@ export default function Login() {
               />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Senha</Label>
-                <Link
-                  to="/forgot-password"
-                  className="text-sm font-medium text-primary hover:underline"
-                >
-                  Esqueceu a senha?
-                </Link>
-              </div>
+              <Label htmlFor="password">Senha</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="Mínimo 8 caracteres"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="remember"
-                checked={rememberMe}
-                onCheckedChange={(c) => setRememberMe(c as boolean)}
-              />
-              <label
-                htmlFor="remember"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Lembrar de mim
-              </label>
-            </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Entrando...' : 'Entrar'}
+              {isLoading ? 'Criando conta...' : 'Cadastrar'}
             </Button>
           </form>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4 text-center text-sm text-muted-foreground">
           <div>
-            Não tem uma conta?{' '}
-            <Link to="/register" className="font-semibold text-primary hover:underline">
-              Cadastre-se
+            Já tem uma conta?{' '}
+            <Link to="/login" className="font-semibold text-primary hover:underline">
+              Faça login
             </Link>
           </div>
         </CardFooter>

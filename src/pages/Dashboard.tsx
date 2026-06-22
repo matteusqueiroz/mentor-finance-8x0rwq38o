@@ -7,6 +7,8 @@ import {
   TrendingUp,
   Sparkles,
   Activity,
+  Bot,
+  AlertCircle,
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
@@ -16,6 +18,9 @@ import { Progress } from '@/components/ui/progress'
 import useFinanceStore from '@/stores/use-finance-store'
 import { useAuth } from '@/hooks/use-auth'
 import { getAcompanhamentos } from '@/services/db'
+import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase/client'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const fallbackCashFlowData = [
   { day: '01', in: 4000, out: 2400 },
@@ -30,7 +35,10 @@ const fallbackCashFlowData = [
 export default function Dashboard() {
   const { user } = useAuth()
   const { transactions } = useFinanceStore()
+  const { toast } = useToast()
   const [cashFlowData, setCashFlowData] = useState(fallbackCashFlowData)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [aiStatus, setAiStatus] = useState<'idle' | 'missing_key' | 'success'>('idle')
   const [stats, setStats] = useState({
     saldo: 24500,
     receitas: 45231.89,
@@ -68,8 +76,78 @@ export default function Dashboard() {
     out: { label: 'Despesas', color: 'hsl(var(--destructive))' },
   }
 
+  const handleAiAnalysis = async () => {
+    if (!user) return
+    setIsAnalyzing(true)
+    setAiStatus('idle')
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-document', {
+        body: { documentText: 'Analisar finanças baseadas no fluxo de caixa recente.' },
+      })
+
+      if (error || !data || data?.error === 'AI_KEY_MISSING') {
+        setAiStatus('missing_key')
+        toast({
+          title: 'Configuração Pendente',
+          description: 'A chave da IA não está configurada.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      setAiStatus('success')
+      toast({
+        title: 'Análise Concluída',
+        description: 'Sua IA gerou um novo diagnóstico com sucesso!',
+      })
+
+      const { data: empData } = await supabase
+        .from('empresas')
+        .select('id')
+        .eq('user_id', user.id)
+        .limit(1)
+      let empId = empData?.[0]?.id
+
+      if (!empId) {
+        const { data: newEmp } = await supabase
+          .from('empresas')
+          .insert({
+            user_id: user.id,
+            nome_empresa: 'Minha Empresa (Gerada por IA)',
+          })
+          .select('id')
+          .single()
+        empId = newEmp?.id
+      }
+
+      if (empId) {
+        await supabase.from('diagnosticos').insert({
+          user_id: user.id,
+          empresa_id: empId,
+          dados: data.analysis.extracted_data || {},
+          plano_acao: data.analysis.plano_acao || {},
+        })
+      }
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
   return (
     <div className="space-y-8 animate-slide-up">
+      {aiStatus === 'missing_key' && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>IA Indisponível</AlertTitle>
+          <AlertDescription>
+            A integração com a IA requer uma chave de API válida (ANTHROPIC_API_KEY). Configure suas
+            variáveis de ambiente para habilitar os diagnósticos automatizados.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard de Resultados</h1>
@@ -77,9 +155,20 @@ export default function Dashboard() {
             Acompanhe seus indicadores, receitas, despesas e fluxo de caixa.
           </p>
         </div>
-        <Button className="shrink-0 rounded-full shadow-subtle active:scale-95 transition-transform">
-          Adicionar Transação
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={handleAiAnalysis}
+            disabled={isAnalyzing}
+            className="shrink-0 rounded-full shadow-subtle active:scale-95 transition-transform"
+          >
+            <Bot className="mr-2 h-4 w-4" />
+            {isAnalyzing ? 'Analisando...' : 'Gerar Diagnóstico IA'}
+          </Button>
+          <Button className="shrink-0 rounded-full shadow-subtle active:scale-95 transition-transform">
+            Adicionar Transação
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
