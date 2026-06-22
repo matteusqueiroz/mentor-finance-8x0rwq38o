@@ -181,6 +181,7 @@ export type Database = {
           custo_direto_anual: number | null
           despesas_variaveis_mensal: number | null
           dores_principais: string[] | null
+          email_contabilidade: string | null
           faturamento_anual: number | null
           id: string
           impostos_mensal: number | null
@@ -205,6 +206,7 @@ export type Database = {
           custo_direto_anual?: number | null
           despesas_variaveis_mensal?: number | null
           dores_principais?: string[] | null
+          email_contabilidade?: string | null
           faturamento_anual?: number | null
           id?: string
           impostos_mensal?: number | null
@@ -229,6 +231,7 @@ export type Database = {
           custo_direto_anual?: number | null
           despesas_variaveis_mensal?: number | null
           dores_principais?: string[] | null
+          email_contabilidade?: string | null
           faturamento_anual?: number | null
           id?: string
           impostos_mensal?: number | null
@@ -243,6 +246,33 @@ export type Database = {
           setor?: string | null
           tem_controle?: string | null
           tipo_clientes?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notificacoes: {
+        Row: {
+          criado_em: string
+          id: string
+          lida: boolean | null
+          mensagem: string
+          titulo: string
+          user_id: string
+        }
+        Insert: {
+          criado_em?: string
+          id?: string
+          lida?: boolean | null
+          mensagem: string
+          titulo: string
+          user_id: string
+        }
+        Update: {
+          criado_em?: string
+          id?: string
+          lida?: boolean | null
+          mensagem?: string
+          titulo?: string
           user_id?: string
         }
         Relationships: []

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Download, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useNavigate } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
@@ -13,6 +14,7 @@ import { ReportsTab } from '@/components/dashboard/ReportsTab'
 export default function Dashboard() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const navigate = useNavigate()
 
   const [data, setData] = useState<any[]>([])
   const [stats, setStats] = useState({
@@ -130,7 +132,10 @@ export default function Dashboard() {
             Acompanhe indicadores, simule cenários e gere relatórios.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap justify-end sm:flex-nowrap">
+          <Button variant="default" onClick={() => navigate('/documentos')} className="shadow-sm">
+            <FileText className="mr-2 h-4 w-4" /> Contabilidade
+          </Button>
           <Button variant="outline" onClick={handleExportCSV} className="shadow-sm">
             <Download className="mr-2 h-4 w-4" /> CSV
           </Button>

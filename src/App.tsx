@@ -10,6 +10,7 @@ import Organizacao from './pages/Organizacao'
 import Advisor from './pages/Advisor'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
+import Documentos from './pages/Documentos'
 import { FinanceProvider } from './stores/use-finance-store'
 import { ThemeProvider } from './components/theme-provider'
 
@@ -68,6 +69,7 @@ const App = () => (
                 <Route path="/onboarding/template" element={<TemplateFlow />} />
 
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/documentos" element={<Documentos />} />
                 <Route path="/diagnostico" element={<Diagnostico />} />
                 <Route path="/plano" element={<PlanoAcao />} />
                 <Route path="/organizacao" element={<Organizacao />} />
