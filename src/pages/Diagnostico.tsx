@@ -136,6 +136,63 @@ export default function Diagnostico() {
                   </div>
                 </div>
               ))}
+
+              {dbDemonstrativos?.fleuriet && (
+                <div className="mt-6 pt-6 border-t border-slate-800">
+                  <h4 className="text-sm font-semibold text-slate-200 mb-4">
+                    Modelo Fleuriet (Gestão Dinâmica)
+                  </h4>
+                  <div className="grid grid-cols-1 gap-3">
+                    <div className="flex justify-between items-center p-3 bg-slate-800/30 rounded-lg border border-slate-800/50">
+                      <div>
+                        <span className="text-sm font-medium text-slate-300 block">
+                          Capital de Giro (CDG)
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          Recursos de longo prazo aplicados no curto prazo
+                        </span>
+                      </div>
+                      <span className="text-sm font-semibold text-slate-100">
+                        {dbDemonstrativos.fleuriet.cdg != null
+                          ? `R$ ${dbDemonstrativos.fleuriet.cdg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          : 'N/D'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-slate-800/30 rounded-lg border border-slate-800/50">
+                      <div>
+                        <span className="text-sm font-medium text-slate-300 block">
+                          Necessidade de Giro (NIG)
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          Recursos demandados pela operação
+                        </span>
+                      </div>
+                      <span className="text-sm font-semibold text-slate-100">
+                        {dbDemonstrativos.fleuriet.nig != null
+                          ? `R$ ${dbDemonstrativos.fleuriet.nig.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          : 'N/D'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-slate-800/30 rounded-lg border border-slate-800/50">
+                      <div>
+                        <span className="text-sm font-medium text-slate-300 block">
+                          Saldo de Tesouraria (ST)
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          Reserva financeira (CDG - NIG)
+                        </span>
+                      </div>
+                      <span
+                        className={`text-sm font-semibold ${dbDemonstrativos.fleuriet.st >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                      >
+                        {dbDemonstrativos.fleuriet.st != null
+                          ? `R$ ${dbDemonstrativos.fleuriet.st.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          : 'N/D'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
             <div className="p-4 border-t border-slate-800">
               <Button

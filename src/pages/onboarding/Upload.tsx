@@ -89,7 +89,7 @@ export default function Upload() {
           nome_arquivo: item.file.name,
           url_arquivo: publicUrlData.publicUrl,
           tipo_documento: item.file.type,
-          status: 'enviado',
+          status: 'pendente',
         })
         .select()
         .single()
@@ -133,6 +133,11 @@ export default function Upload() {
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(event.target.files || [])
     if (!selected.length || !user) return
+
+    // Clear input so the same file can be selected again
+    if (event.target) {
+      event.target.value = ''
+    }
 
     const newFiles: FileItem[] = selected.map((file) => ({
       id: Math.random().toString(36).substring(2),
@@ -305,7 +310,13 @@ export default function Upload() {
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
                 Formatos: PDF, Excel, CSV (Máx. 25MB)
               </p>
-              <Button className="mt-6 font-semibold" onClick={triggerFileInput}>
+              <Button
+                className="mt-6 font-semibold"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  triggerFileInput()
+                }}
+              >
                 Procurar Arquivos
               </Button>
             </div>
@@ -425,9 +436,18 @@ export default function Upload() {
               </div>
 
               <div className="pt-6 border-t border-slate-200 dark:border-slate-800">
-                <h4 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-4">
-                  Indicadores Fleuriet Extraídos (Opcional)
-                </h4>
+                <div className="flex items-center gap-2 mb-4">
+                  <h4 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                    Análise Modelo Fleuriet
+                  </h4>
+                  <span className="bg-blue-100 text-blue-800 text-[10px] uppercase font-bold px-2 py-0.5 rounded">
+                    IA Automática
+                  </span>
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                  Estes são os indicadores de gestão de capital de giro extraídos dos seus
+                  documentos.
+                </p>{' '}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <MoneyField
                     label="Capital de Giro Líquido (CDG)"

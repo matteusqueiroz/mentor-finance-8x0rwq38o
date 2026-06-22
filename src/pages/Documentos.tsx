@@ -102,8 +102,8 @@ export default function Documentos() {
   }, [user])
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file || !user) return
+    const selectedFiles = Array.from(event.target.files || [])
+    if (!selectedFiles.length || !user) return
 
     if (!empresaId) {
       toast({
@@ -116,96 +116,103 @@ export default function Documentos() {
     }
 
     setUploading(true)
+
+    // Clear input so the same file can be selected again
+    if (event.target) {
+      event.target.value = ''
+    }
+
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
-      const filePath = `${user.id}/${fileName}`
+      for (const file of selectedFiles) {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+        const filePath = `${user.id}/${fileName}`
 
-      // 1. Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('documentos')
-        .upload(filePath, file)
+        // 1. Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from('documentos')
+          .upload(filePath, file)
 
-      if (uploadError) throw uploadError
+        if (uploadError) throw uploadError
 
-      const { data: publicUrlData } = supabase.storage.from('documentos').getPublicUrl(filePath)
+        const { data: publicUrlData } = supabase.storage.from('documentos').getPublicUrl(filePath)
 
-      // 2. Insert into DB
-      const { data: doc, error: insertError } = await supabase
-        .from('documentos_contabeis')
-        .insert({
-          user_id: user.id,
-          empresa_id: empresaId,
-          nome_arquivo: file.name,
-          url_arquivo: publicUrlData.publicUrl,
-          tipo_documento: file.type,
-          status: 'pendente',
-        })
-        .select()
-        .single()
-
-      if (insertError) throw insertError
-
-      toast({
-        title: 'Sucesso',
-        description: 'Documento enviado. Iniciando análise...',
-      })
-
-      // 3. Analyze document via Edge Function
-      const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
-        'analyze-document',
-        {
-          body: { documentUrl: publicUrlData.publicUrl, fileName: file.name, documentId: doc.id },
-        },
-      )
-
-      if (analysisError) {
-        await supabase.from('documentos_contabeis').update({ status: 'erro' }).eq('id', doc.id)
-        throw analysisError
-      }
-
-      let finalStatus = 'processado'
-
-      if (emailContabilidade) {
-        // 4. Send to Accountant if configured
-        const { error: sendError } = await supabase.functions.invoke('send-accounting-email', {
-          body: { record: doc },
-        })
-
-        if (sendError) {
-          finalStatus = 'erro_envio'
-          toast({
-            title: 'Aviso',
-            description: 'Documento analisado, mas falhou ao enviar para a contabilidade.',
-            variant: 'destructive',
+        // 2. Insert into DB
+        const { data: doc, error: insertError } = await supabase
+          .from('documentos_contabeis')
+          .insert({
+            user_id: user.id,
+            empresa_id: empresaId,
+            nome_arquivo: file.name,
+            url_arquivo: publicUrlData.publicUrl,
+            tipo_documento: file.type,
+            status: 'pendente',
           })
+          .select()
+          .single()
+
+        if (insertError) throw insertError
+
+        toast({
+          title: 'Enviado',
+          description: `${file.name} enviado. Iniciando análise...`,
+        })
+
+        // 3. Analyze document via Edge Function
+        const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
+          'analyze-document',
+          {
+            body: { documentUrl: publicUrlData.publicUrl, fileName: file.name, documentId: doc.id },
+          },
+        )
+
+        if (analysisError) {
+          await supabase.from('documentos_contabeis').update({ status: 'erro' }).eq('id', doc.id)
+          throw analysisError
+        }
+
+        let finalStatus = 'processado'
+
+        if (emailContabilidade) {
+          // 4. Send to Accountant if configured
+          const { error: sendError } = await supabase.functions.invoke('send-accounting-email', {
+            body: { record: doc },
+          })
+
+          if (sendError) {
+            finalStatus = 'erro_envio'
+            toast({
+              title: 'Aviso',
+              description: `${file.name} analisado, mas falhou ao enviar para a contabilidade.`,
+              variant: 'destructive',
+            })
+          } else {
+            finalStatus = 'enviado'
+            toast({
+              title: 'Sucesso',
+              description: `${file.name} analisado e enviado à contabilidade.`,
+            })
+          }
         } else {
-          finalStatus = 'enviado'
           toast({
-            title: 'Enviado',
-            description: 'Documento analisado e enviado à contabilidade.',
+            title: 'Processado',
+            description: `${file.name} analisado.`,
           })
         }
-      } else {
-        toast({
-          title: 'Processado',
-          description:
-            'Documento analisado. Configure o e-mail da contabilidade para envio automático.',
-        })
-      }
 
-      // 5. Update final status in DB
-      await supabase
-        .from('documentos_contabeis')
-        .update({
-          status: finalStatus,
-          analise_ia: analysisData?.analysis,
-        })
-        .eq('id', doc.id)
+        // 5. Update final status in DB
+        await supabase
+          .from('documentos_contabeis')
+          .update({
+            status: finalStatus,
+            analise_ia: analysisData?.analysis,
+          })
+          .eq('id', doc.id)
+      }
     } catch (error: any) {
       toast({
         title: 'Erro',
-        description: error.message || 'Falha ao fazer upload ou processar o documento.',
+        description: error.message || 'Falha ao fazer upload ou processar os documentos.',
         variant: 'destructive',
       })
     } finally {
@@ -230,11 +237,12 @@ export default function Documentos() {
         <div className="flex gap-2 w-full sm:w-auto">
           <input
             type="file"
-            accept="image/*,application/pdf"
+            accept="image/*,application/pdf,.xlsx,.xls,.csv"
             className="hidden"
             ref={fileInputRef}
             onChange={handleFileUpload}
             disabled={uploading}
+            multiple
           />
           <input
             type="file"

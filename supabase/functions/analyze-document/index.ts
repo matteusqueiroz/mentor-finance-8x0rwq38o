@@ -82,34 +82,40 @@ Deno.serve(async (req: Request) => {
 
     content.push({
       type: 'text',
-      text: `Analise este documento contábil/financeiro e extraia os seguintes dados em formato JSON estrito, sem nenhum texto adicional antes ou depois. 
-Use chaves nulas (null) para campos não encontrados ou indisponíveis no documento.
-Campos esperados:
+      text: `Você é um analista financeiro sênior. Analise este documento contábil/financeiro (DRE, Balanço ou DFC) e extraia os dados solicitados abaixo em formato JSON estrito, sem nenhum texto adicional antes ou depois.
+Importante para o Modelo Fleuriet: Identifique com precisão o "ativo_circulante_operacional" (ex: Contas a Receber, Estoques) e o "passivo_circulante_operacional" (ex: Fornecedores, Impostos/Salários a Pagar).
+Escreva também um "summary" em linguagem de negócios amigável ao empreendedor (sem jargão contábil complexo), resumindo o que o documento representa e se parece saudável.
+Use chaves nulas (null) para campos numéricos não encontrados.
+
+Formato esperado do JSON:
 {
-  "receita_bruta": number | null,
-  "receita_liquida": number | null,
-  "cmv": number | null,
-  "despesas_operacionais": number | null,
-  "depreciacao_amortizacao": number | null,
-  "lucro_operacional": number | null,
-  "lucro_liquido": number | null,
-  "ativo_circulante": number | null,
-  "ativo_nao_circulante": number | null,
-  "ativo_total": number | null,
-  "passivo_circulante": number | null,
-  "passivo_nao_circulante": number | null,
-  "passivo_total": number | null,
-  "patrimonio_liquido": number | null,
-  "estoques": number | null,
-  "contas_a_receber": number | null,
-  "fornecedores": number | null,
-  "ativo_circulante_operacional": number | null,
-  "passivo_circulante_operacional": number | null,
-  "fluxo_operacional": number | null,
-  "fluxo_investimento": number | null,
-  "fluxo_financiamento": number | null,
-  "saldo_inicial": number | null,
-  "saldo_final": number | null
+  "summary": "string",
+  "extracted_data": {
+    "receita_bruta": number | null,
+    "receita_liquida": number | null,
+    "cmv": number | null,
+    "despesas_operacionais": number | null,
+    "depreciacao_amortizacao": number | null,
+    "lucro_operacional": number | null,
+    "lucro_liquido": number | null,
+    "ativo_circulante": number | null,
+    "ativo_nao_circulante": number | null,
+    "ativo_total": number | null,
+    "passivo_circulante": number | null,
+    "passivo_nao_circulante": number | null,
+    "passivo_total": number | null,
+    "patrimonio_liquido": number | null,
+    "estoques": number | null,
+    "contas_a_receber": number | null,
+    "fornecedores": number | null,
+    "ativo_circulante_operacional": number | null,
+    "passivo_circulante_operacional": number | null,
+    "fluxo_operacional": number | null,
+    "fluxo_investimento": number | null,
+    "fluxo_financiamento": number | null,
+    "saldo_inicial": number | null,
+    "saldo_final": number | null
+  }
 }`,
     })
 
@@ -136,21 +142,23 @@ Campos esperados:
     const result = await anthropicResponse.json()
     const textOutput = result.content[0].text
 
-    let extractedData = {}
+    let parsed: any = {}
     try {
       const jsonMatch = textOutput.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
-        extractedData = JSON.parse(jsonMatch[0])
+        parsed = JSON.parse(jsonMatch[0])
       } else {
-        extractedData = JSON.parse(textOutput)
+        parsed = JSON.parse(textOutput)
       }
     } catch (e) {
       console.error('Falha ao parsear JSON:', textOutput)
     }
 
     const analysis = {
-      summary: 'Dados extraídos do documento com sucesso.',
-      extracted_data: extractedData,
+      summary:
+        parsed.summary ||
+        'Dados extraídos do documento com sucesso. O documento está em processo de classificação.',
+      extracted_data: parsed.extracted_data || parsed,
     }
 
     return new Response(JSON.stringify({ success: true, analysis }), {
