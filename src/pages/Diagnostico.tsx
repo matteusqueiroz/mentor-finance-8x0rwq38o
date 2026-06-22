@@ -1,272 +1,139 @@
-import { useState } from 'react'
-import {
-  UploadCloud,
-  FileText,
-  CheckCircle2,
-  TrendingUp,
-  AlertTriangle,
-  Lightbulb,
-} from 'lucide-react'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useEffect, useState, useMemo } from 'react'
+import { Lightbulb, TrendingUp, AlertTriangle, ArrowRight } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import {
-  Bar,
-  BarChart,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Cell,
-  PieChart,
-  Pie,
-  Legend,
-} from 'recharts'
-import useFinanceStore from '@/stores/use-finance-store'
-
-const costsData = [
-  { name: 'Fixos', value: 15000 },
-  { name: 'Variáveis', value: 8500 },
-]
-
-const breakEvenData = [
-  { month: 'Jul', receita: 30000, custo: 28000 },
-  { month: 'Ago', receita: 32000, custo: 29000 },
-  { month: 'Set', receita: 45000, custo: 32000 },
-]
+import { useOnboardingStore } from '@/stores/use-onboarding-store'
+import { calcularKPIs, gerarDiagnosticoIA, Indicador } from '@/lib/motor-de-confianca'
+import { Link } from 'react-router-dom'
 
 export default function Diagnostico() {
-  const { healthScore } = useFinanceStore()
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [showReport, setShowReport] = useState(true)
+  const { demonstrativos, origemConfiabilidade } = useOnboardingStore()
+  const [isProcessing, setIsProcessing] = useState(true)
+  const [diagnostico, setDiagnostico] = useState<{ narrativa: string; pontuacao: number } | null>(
+    null,
+  )
 
-  const handleUpload = () => {
-    setIsProcessing(true)
-    setTimeout(() => {
+  const kpis = useMemo(() => calcularKPIs(demonstrativos), [demonstrativos])
+
+  useEffect(() => {
+    gerarDiagnosticoIA(kpis, origemConfiabilidade).then((res) => {
+      setDiagnostico(res)
       setIsProcessing(false)
-      setShowReport(true)
-    }, 2000)
+    })
+  }, [kpis, origemConfiabilidade])
+
+  const classColors = {
+    otimo: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20',
+    bom: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
+    atencao: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
+    critico: 'text-red-400 bg-red-400/10 border-red-400/20',
+    indisponivel: 'text-slate-400 bg-slate-800 border-slate-700',
   }
 
-  const chartConfigPie = {
-    Fixos: { label: 'Custos Fixos', color: 'hsl(var(--secondary))' },
-    Variáveis: { label: 'Custos Variáveis', color: 'hsl(var(--primary))' },
-  }
-
-  const chartConfigBar = {
-    receita: { label: 'Receitas', color: 'hsl(var(--primary))' },
-    custo: { label: 'Custos Totais', color: 'hsl(var(--muted-foreground))' },
+  const formatValue = (ind: Indicador) => {
+    if (ind.valor === null) return 'N/D'
+    if (ind.formato === 'percentual') return `${ind.valor.toFixed(1)}%`
+    if (ind.formato === 'moeda')
+      return `R$ ${ind.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+    return ind.valor.toFixed(2)
   }
 
   return (
-    <div className="space-y-8 animate-slide-up">
+    <div className="space-y-8 animate-fade-in max-w-5xl mx-auto py-6 px-4">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Diagnóstico Financeiro</h1>
-        <p className="text-muted-foreground mt-1">
-          Importe seus dados e deixe a IA revelar a saúde do seu negócio.
+        <h1 className="text-3xl font-bold tracking-tight text-slate-100">Diagnóstico IA</h1>
+        <p className="text-slate-400 mt-1">
+          Interpretado deterministicamente a partir de{' '}
+          {origemConfiabilidade === 'extraido'
+            ? 'documentos'
+            : origemConfiabilidade === 'estimado'
+              ? 'suas estimativas'
+              : 'seus lançamentos'}
+          .
         </p>
       </div>
 
-      <Tabs defaultValue={showReport ? 'relatorio' : 'importacao'} className="w-full">
-        <TabsList className="mb-6 bg-muted/50 p-1">
-          <TabsTrigger value="importacao" className="rounded-lg">
-            1. Importação de Dados
-          </TabsTrigger>
-          <TabsTrigger value="relatorio" disabled={!showReport} className="rounded-lg">
-            2. Relatório IA
-          </TabsTrigger>
-        </TabsList>
+      {isProcessing ? (
+        <Card className="bg-slate-900 border-slate-800">
+          <CardContent className="p-16 flex flex-col items-center animate-pulse">
+            <Lightbulb className="h-16 w-16 text-blue-500 mb-6" />
+            <h3 className="text-xl font-medium text-slate-200">
+              A IA está escrevendo o parecer...
+            </h3>
+            <p className="text-slate-500 mt-2">Isto não levará muito tempo.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid md:grid-cols-3 gap-6">
+          <Card className="md:col-span-2 bg-slate-900 border-slate-800 h-max">
+            <CardHeader className="bg-blue-500/5 pb-4 border-b border-slate-800 rounded-t-xl">
+              <CardTitle className="flex items-center gap-2 text-blue-400">
+                <Lightbulb className="h-5 w-5" />
+                Parecer Estratégico
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-6">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                <div className="flex flex-col items-center justify-center h-24 w-24 rounded-full border-4 border-blue-500/30 text-blue-400 shrink-0 bg-blue-500/10">
+                  <span className="text-3xl font-bold">{diagnostico?.pontuacao}</span>
+                  <span className="text-xs mt-0.5">Health</span>
+                </div>
+                <div className="text-slate-300 leading-relaxed text-sm md:text-base text-center sm:text-left">
+                  {diagnostico?.narrativa}
+                </div>
+              </div>
+              <div className="flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl mt-4 border border-slate-700">
+                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-slate-300">
+                  <strong className="text-amber-500">Nota:</strong> A IA não realiza cálculos. Todos
+                  os indicadores apresentados foram computados de forma exata pelo Motor de
+                  Confiança.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
-        <TabsContent value="importacao">
-          <Card className="shadow-subtle border-none">
-            <CardHeader>
-              <CardTitle>Enviar Extratos ou Planilhas</CardTitle>
-              <CardDescription>
-                Arraste arquivos OFX, PDF ou CSV para análise automática.
+          <Card className="bg-slate-900 border-slate-800 flex flex-col h-max">
+            <CardHeader className="pb-4 border-b border-slate-800">
+              <CardTitle className="text-lg text-slate-200">Indicadores Calculados</CardTitle>
+              <CardDescription className="text-slate-400">
+                Gerados via Motor TypeScript
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div
-                className="border-2 border-dashed border-border rounded-xl p-12 flex flex-col items-center justify-center text-center bg-muted/20 hover:bg-muted/40 transition-colors cursor-pointer"
-                onClick={handleUpload}
-              >
-                {isProcessing ? (
-                  <div className="flex flex-col items-center animate-pulse">
-                    <FileText className="h-12 w-12 text-primary mb-4" />
-                    <h3 className="text-lg font-medium">A IA está analisando seus dados...</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Isso leva apenas alguns segundos.
-                    </p>
+            <CardContent className="flex-1 space-y-5 pt-4">
+              {Object.values(kpis).map((ind, i) => (
+                <div
+                  key={i}
+                  className="flex flex-col gap-1.5 pb-4 border-b border-slate-800/50 last:border-0 last:pb-0"
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-slate-300">{ind.nome}</span>
+                    <span className="text-sm font-semibold text-slate-100">{formatValue(ind)}</span>
                   </div>
-                ) : (
-                  <>
-                    <UploadCloud className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium mb-1">
-                      Clique para fazer upload ou arraste arquivos aqui
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Formatos suportados: .ofx, .csv, .pdf (extratos bancários)
-                    </p>
-                    <Button variant="secondary" className="rounded-full shadow-sm">
-                      Selecionar Arquivos
-                    </Button>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="relatorio" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-3">
-            <Card className="md:col-span-2 shadow-subtle border-none">
-              <CardHeader className="bg-primary/5 pb-4 border-b rounded-t-xl">
-                <CardTitle className="flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5 text-primary" />
-                  Parecer do Consultor IA
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4 text-foreground/90 leading-relaxed">
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-background rounded-xl p-4 border border-border/50 shadow-sm mb-4">
-                  <div className="relative h-28 w-28 flex items-center justify-center shrink-0">
-                    <ChartContainer config={{}} className="h-full w-full absolute inset-0">
-                      <PieChart>
-                        <Pie
-                          data={[{ value: healthScore }, { value: 100 - healthScore }]}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={55}
-                          startAngle={90}
-                          endAngle={-270}
-                          dataKey="value"
-                          stroke="none"
-                        >
-                          <Cell fill="hsl(var(--primary))" />
-                          <Cell fill="hsl(var(--muted))" />
-                        </Pie>
-                      </PieChart>
-                    </ChartContainer>
-                    <div className="text-center z-10">
-                      <span className="text-2xl font-bold">{healthScore}</span>
-                      <span className="text-xs text-muted-foreground block -mt-1">/100</span>
-                    </div>
-                  </div>
-                  <div className="flex-1 space-y-1 text-center sm:text-left mt-2 sm:mt-0">
-                    <h3 className="font-semibold text-lg text-foreground">Health Score: Bom</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Sua empresa apresenta uma saúde financeira controlada, mas com oportunidades
-                      de otimização nos custos fixos identificadas pela nossa IA.
-                    </p>
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span
+                      className={`px-2 py-0.5 rounded border capitalize font-medium ${classColors[ind.classificacao]}`}
+                    >
+                      {ind.classificacao}
+                    </span>
+                    <span className="text-slate-500">{ind.referencia}</span>
                   </div>
                 </div>
-
-                <p>
-                  Olá! Analisei seus últimos 3 meses de movimentação. Sua empresa apresenta uma{' '}
-                  <strong>Margem de Lucro de 18%</strong>, o que é ótimo para o seu setor.
-                </p>
-                <p>
-                  No entanto, notei um gargalo: seus <strong>custos fixos representam 63%</strong>{' '}
-                  do total de saídas. Isso deixa pouca margem para manobras em meses de baixa
-                  sazonalidade. O maior ofensor atual é o custo com{' '}
-                  <span className="font-semibold text-destructive">Aluguel e Infraestrutura</span>.
-                </p>
-                <div className="flex items-start gap-3 bg-accent/50 p-4 rounded-xl mt-4">
-                  <AlertTriangle className="h-5 w-5 text-secondary shrink-0 mt-0.5" />
-                  <p className="text-sm">
-                    <strong>Ponto de Atenção:</strong> Seu Ponto de Equilíbrio (quanto você precisa
-                    vender para não ter prejuízo) está em R$ 28.500/mês. Recomendo focar em ações
-                    para reduzir o custo fixo e baixar esse limite.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="space-y-6">
-              <Card className="shadow-subtle border-none h-full">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Estrutura de Custos</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col items-center justify-center">
-                  <div className="h-[200px] w-full">
-                    <ChartContainer config={chartConfigPie} className="h-full">
-                      <PieChart>
-                        <Pie
-                          data={costsData}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                        >
-                          {costsData.map((entry, index) => (
-                            <Cell
-                              key={`cell-${index}`}
-                              fill={index === 0 ? 'hsl(var(--secondary))' : 'hsl(var(--primary))'}
-                            />
-                          ))}
-                        </Pie>
-                        <ChartTooltip content={<ChartTooltipContent />} />
-                      </PieChart>
-                    </ChartContainer>
-                  </div>
-                  <div className="flex gap-4 mt-2 text-sm">
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-secondary"></div> Fixos (63%)
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-primary"></div> Variáveis (37%)
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          <Card className="shadow-subtle border-none">
-            <CardHeader>
-              <CardTitle>Evolução de Receitas x Custos Totais</CardTitle>
-              <CardDescription>Análise do distanciamento do Ponto de Equilíbrio</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] w-full">
-                <ChartContainer config={chartConfigBar} className="h-full w-full">
-                  <BarChart data={breakEvenData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tickFormatter={(val) => `R$ ${val / 1000}k`}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="receita" fill="var(--color-receita)" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="custo" fill="var(--color-custo)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ChartContainer>
-              </div>
+              ))}
             </CardContent>
-            <CardFooter className="bg-muted/20 border-t flex justify-end p-4">
+            <div className="p-4 border-t border-slate-800">
               <Button
                 asChild
-                className="rounded-full shadow-subtle hover:scale-95 transition-transform"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium"
               >
-                <a href="/plano">
-                  Gerar Plano de Ação <TrendingUp className="ml-2 h-4 w-4" />
-                </a>
+                <Link to="/plano">
+                  Ver Plano de Ação <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
               </Button>
-            </CardFooter>
+            </div>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </div>
   )
 }

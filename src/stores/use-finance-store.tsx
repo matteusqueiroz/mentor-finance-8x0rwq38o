@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useState, useEffect } from 'react'
 
 export type Transaction = {
   id: string
@@ -10,21 +10,25 @@ export type Transaction = {
   status: 'Pago' | 'Pendente'
 }
 
-export type Task = {
+export interface TarefaPlanoAcao {
   id: string
-  title: string
-  impact: 'Alto' | 'Médio' | 'Baixo'
-  status: 'A Fazer' | 'Fazendo' | 'Concluído'
-  deadline: string
-  description: string
+  acao: string
+  prioridade: 'alta' | 'media' | 'baixa'
+  prazo: string
+  metaValor: number | null
+  metaUnidade: 'BRL' | 'percentual' | 'unidades' | null
+  valorRealizado: number
+  percentualConcluido: number
+  status: 'nao_iniciada' | 'em_andamento' | 'concluida' | 'atrasada' | 'concluida_com_atraso'
+  dataConclusao: string | null
 }
 
 interface FinanceState {
   transactions: Transaction[]
-  tasks: Task[]
+  tasks: TarefaPlanoAcao[]
   healthScore: number
   updateTransactionStatus: (id: string, status: 'Pago' | 'Pendente') => void
-  updateTaskStatus: (id: string, status: 'A Fazer' | 'Fazendo' | 'Concluído') => void
+  registrarValorRealizado: (id: string, valorRealizado: number) => void
 }
 
 const FinanceContext = createContext<FinanceState | undefined>(undefined)
@@ -48,80 +52,108 @@ const initialTransactions: Transaction[] = [
     type: 'out',
     status: 'Pago',
   },
-  {
-    id: '3',
-    date: '2023-10-05',
-    description: 'Energia Elétrica',
-    category: 'Custos Variáveis',
-    amount: 450,
-    type: 'out',
-    status: 'Pendente',
-  },
-  {
-    id: '4',
-    date: '2023-10-08',
-    description: 'Serviços de Consultoria',
-    category: 'Receitas',
-    amount: 8200,
-    type: 'in',
-    status: 'Pendente',
-  },
-  {
-    id: '5',
-    date: '2023-10-10',
-    description: 'Marketing Digital',
-    category: 'Marketing',
-    amount: 1200,
-    type: 'out',
-    status: 'Pago',
-  },
 ]
 
-const initialTasks: Task[] = [
+const initialTasks: TarefaPlanoAcao[] = [
   {
     id: '1',
-    title: 'Renegociar contrato de aluguel',
-    impact: 'Alto',
-    status: 'A Fazer',
-    deadline: '2023-10-15',
-    description:
-      'O valor do aluguel está 15% acima da média da região. Entrar em contato com a imobiliária para renegociação.',
+    acao: 'Renegociar contrato de aluguel para adequação de margem',
+    prioridade: 'alta',
+    prazo: new Date(Date.now() + 10 * 86400000).toISOString().split('T')[0],
+    metaValor: 3000,
+    metaUnidade: 'BRL',
+    valorRealizado: 0,
+    percentualConcluido: 0,
+    status: 'nao_iniciada',
+    dataConclusao: null,
   },
   {
     id: '2',
-    title: 'Cortar assinaturas de software inativas',
-    impact: 'Baixo',
-    status: 'Concluído',
-    deadline: '2023-10-05',
-    description: 'Identificamos 3 ferramentas pagas que não são acessadas há mais de 60 dias.',
+    acao: 'Antecipar recebíveis de clientes com Prazos Longos',
+    prioridade: 'media',
+    prazo: new Date(Date.now() - 2 * 86400000).toISOString().split('T')[0],
+    metaValor: 15000,
+    metaUnidade: 'BRL',
+    valorRealizado: 7500,
+    percentualConcluido: 50,
+    status: 'atrasada',
+    dataConclusao: null,
   },
   {
     id: '3',
-    title: 'Antecipar recebíveis de clientes Prazos Longos',
-    impact: 'Médio',
-    status: 'Fazendo',
-    deadline: '2023-10-20',
-    description:
-      'Melhorar o fluxo de caixa antecipando notas fiscais com vencimento acima de 60 dias.',
+    acao: 'Cortar assinaturas de software inativas',
+    prioridade: 'baixa',
+    prazo: new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0],
+    metaValor: null,
+    metaUnidade: null,
+    valorRealizado: 1,
+    percentualConcluido: 100,
+    status: 'concluida',
+    dataConclusao: new Date().toISOString().split('T')[0],
   },
 ]
 
+export function recalcularTarefa(
+  tarefa: TarefaPlanoAcao,
+  novoValorRealizado: number,
+): TarefaPlanoAcao {
+  const hoje = new Date().toISOString().split('T')[0]
+  const prazo = tarefa.prazo
+
+  let percentual = 0
+  if (tarefa.metaValor && tarefa.metaValor > 0) {
+    percentual = Math.min(100, Math.max(0, (novoValorRealizado / tarefa.metaValor) * 100))
+  } else {
+    percentual = novoValorRealizado > 0 ? 100 : 0
+  }
+
+  let status = tarefa.status
+  let dataConclusao = tarefa.dataConclusao
+
+  if (percentual === 100 && tarefa.percentualConcluido < 100) {
+    dataConclusao = hoje
+  } else if (percentual < 100) {
+    dataConclusao = null
+  }
+
+  if (percentual === 0 && hoje <= prazo) status = 'nao_iniciada'
+  else if (percentual > 0 && percentual < 100 && hoje <= prazo) status = 'em_andamento'
+  else if (percentual === 100 && dataConclusao && dataConclusao <= prazo) status = 'concluida'
+  else if (percentual === 100 && dataConclusao && dataConclusao > prazo)
+    status = 'concluida_com_atraso'
+  else if (percentual < 100 && hoje > prazo) status = 'atrasada'
+
+  return {
+    ...tarefa,
+    valorRealizado: novoValorRealizado,
+    percentualConcluido: percentual,
+    status,
+    dataConclusao,
+  }
+}
+
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions)
-  const [tasks, setTasks] = useState<Task[]>(initialTasks)
+  const [tasks, setTasks] = useState<TarefaPlanoAcao[]>(initialTasks)
   const [healthScore] = useState<number>(78)
+
+  useEffect(() => {
+    setTasks((prev) => prev.map((t) => recalcularTarefa(t, t.valorRealizado)))
+  }, [])
 
   const updateTransactionStatus = (id: string, status: 'Pago' | 'Pendente') => {
     setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)))
   }
 
-  const updateTaskStatus = (id: string, status: 'A Fazer' | 'Fazendo' | 'Concluído') => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)))
+  const registrarValorRealizado = (id: string, valorRealizado: number) => {
+    setTasks((prev) => prev.map((t) => (t.id === id ? recalcularTarefa(t, valorRealizado) : t)))
   }
 
   return React.createElement(
     FinanceContext.Provider,
-    { value: { transactions, tasks, healthScore, updateTransactionStatus, updateTaskStatus } },
+    {
+      value: { transactions, tasks, healthScore, updateTransactionStatus, registrarValorRealizado },
+    },
     children,
   )
 }
