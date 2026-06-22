@@ -71,3 +71,19 @@ export const getAcompanhamentos = async (userId: string) => {
   if (error) throw error
   return data
 }
+
+export const clearUserHistory = async (userId: string) => {
+  // Clear acompanhamentos first (has FK to diagnosticos)
+  const { error: errAcomp } = await supabase.from('acompanhamentos').delete().eq('user_id', userId)
+  if (errAcomp) throw errAcomp
+
+  // Clear valuations
+  const { error: errVal } = await supabase.from('valuations').delete().eq('user_id', userId)
+  if (errVal) throw errVal
+
+  // Clear diagnosticos
+  const { error: errDiag } = await supabase.from('diagnosticos').delete().eq('user_id', userId)
+  if (errDiag) throw errDiag
+
+  return true
+}

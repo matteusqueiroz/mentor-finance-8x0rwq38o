@@ -1,10 +1,18 @@
-import { Link, Outlet, useLocation } from 'react-router-dom'
-import { Briefcase, Settings, ShieldCheck, Moon, Sun } from 'lucide-react'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Briefcase, Settings, ShieldCheck, Moon, Sun, LogOut } from 'lucide-react'
 import { useTheme } from '@/components/theme-provider'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function Layout() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
+  const { signOut } = useAuth()
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/login')
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-300">
@@ -65,6 +73,13 @@ export default function Layout() {
             >
               <Settings className="h-5 w-5" />
             </Link>
+            <button
+              onClick={handleSignOut}
+              title="Sair"
+              className="text-muted-foreground hover:text-red-500 transition-colors p-1 rounded-full hover:bg-muted"
+            >
+              <LogOut className="h-5 w-5" />
+            </button>
           </nav>
         </div>
       </header>
