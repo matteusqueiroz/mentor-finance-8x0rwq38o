@@ -1,6 +1,7 @@
 {
   "_versions": {
     "analyze-document": 2,
-    "generate-report": 1
+    "generate-report": 1,
+    "chat-advisor": 1
   }
 }
