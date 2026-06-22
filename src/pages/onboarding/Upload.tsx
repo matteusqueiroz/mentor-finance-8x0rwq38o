@@ -67,6 +67,27 @@ export default function Upload() {
         prev.map((f) => (f.id === item.id ? { ...f, status: 'uploading', progress: 20 } : f)),
       )
 
+      // Idempotency check: reuse analysis if file with same name exists and was processed recently
+      const { data: existingDocs } = await supabase
+        .from('documentos_contabeis')
+        .select('*')
+        .eq('user_id', user!.id)
+        .eq('nome_arquivo', item.file.name)
+        .eq('status', 'processado')
+        .order('criado_em', { ascending: false })
+        .limit(1)
+
+      if (existingDocs && existingDocs.length > 0 && existingDocs[0].analise_ia) {
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === item.id
+              ? { ...f, status: 'done', progress: 100, analysis: existingDocs[0].analise_ia }
+              : f,
+          ),
+        )
+        return
+      }
+
       const fileExt = item.file.name.split('.').pop()
       const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
       const filePath = `${user!.id}/${fileName}`
@@ -174,29 +195,34 @@ export default function Upload() {
       }
     })
 
-    const ativo_circulante = merged.ativo_circulante || 0
-    const passivo_circulante = merged.passivo_circulante || 0
-    const ativo_circulante_op =
-      merged.ativo_circulante_operacional ||
-      (merged.contas_a_receber || 0) + (merged.estoques || 0) ||
-      0
-    const passivo_circulante_op =
-      merged.passivo_circulante_operacional || merged.fornecedores || 0 || 0
+    const hasAtivoPassivo =
+      merged.ativo_circulante !== undefined && merged.passivo_circulante !== undefined
+    const CDG = hasAtivoPassivo
+      ? (merged.ativo_circulante || 0) - (merged.passivo_circulante || 0)
+      : null
 
-    const CDG = ativo_circulante - passivo_circulante
-    const NIG = ativo_circulante_op - passivo_circulante_op
-    const ST = CDG - NIG
+    const hasNIGInputs =
+      merged.ativo_circulante_operacional !== undefined ||
+      merged.contas_a_receber !== undefined ||
+      merged.estoques !== undefined
+    const ativo_circulante_op =
+      merged.ativo_circulante_operacional ?? (merged.contas_a_receber || 0) + (merged.estoques || 0)
+    const passivo_circulante_op =
+      merged.passivo_circulante_operacional ?? (merged.fornecedores || 0)
+
+    const NIG = hasNIGInputs ? ativo_circulante_op - passivo_circulante_op : null
+    const ST = CDG !== null && NIG !== null ? CDG - NIG : null
 
     setEmpresaData({
-      faturamento_anual: merged.receita_bruta || merged.faturamento_anual || null,
-      impostos_mensal: merged.impostos_mensal || null,
-      salarios_mensal: merged.salarios_mensal || null,
-      aluguel_mensal: merged.aluguel_mensal || null,
-      outras_despesas_fixas_mensal: merged.outras_despesas_fixas_mensal || null,
-      despesas_variaveis_mensal: merged.despesas_variaveis_mensal || null,
-      fleuriet_cdg: CDG !== 0 ? CDG : null,
-      fleuriet_nig: NIG !== 0 ? NIG : null,
-      fleuriet_st: ST !== 0 ? ST : null,
+      faturamento_anual: merged.receita_bruta ?? merged.faturamento_anual ?? null,
+      impostos_mensal: merged.impostos_mensal ?? null,
+      salarios_mensal: merged.salarios_mensal ?? null,
+      aluguel_mensal: merged.aluguel_mensal ?? null,
+      outras_despesas_fixas_mensal: merged.outras_despesas_fixas_mensal ?? null,
+      despesas_variaveis_mensal: merged.despesas_variaveis_mensal ?? null,
+      fleuriet_cdg: CDG,
+      fleuriet_nig: NIG,
+      fleuriet_st: ST,
     })
 
     onboardingActions.preencherDeExtracao({
@@ -300,6 +326,7 @@ export default function Upload() {
                 className="hidden"
                 ref={fileInputRef}
                 onChange={handleFileChange}
+                onClick={(e) => e.stopPropagation()}
                 accept=".pdf,.xlsx,.xls,.csv"
                 multiple
               />
@@ -316,6 +343,7 @@ export default function Upload() {
                   e.stopPropagation()
                   triggerFileInput()
                 }}
+                type="button"
               >
                 Procurar Arquivos
               </Button>
@@ -405,34 +433,90 @@ export default function Upload() {
             </CardHeader>
             <CardContent className="space-y-6 pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <MoneyField
-                  label="Faturamento Anual"
-                  value={empresaData.faturamento_anual}
-                  onChange={(v: number | null) =>
-                    setEmpresaData((p) => ({ ...p, faturamento_anual: v }))
-                  }
-                />
-                <MoneyField
-                  label="Impostos (Mensal)"
-                  value={empresaData.impostos_mensal}
-                  onChange={(v: number | null) =>
-                    setEmpresaData((p) => ({ ...p, impostos_mensal: v }))
-                  }
-                />
-                <MoneyField
-                  label="Salários (Mensal)"
-                  value={empresaData.salarios_mensal}
-                  onChange={(v: number | null) =>
-                    setEmpresaData((p) => ({ ...p, salarios_mensal: v }))
-                  }
-                />
-                <MoneyField
-                  label="Despesas Variáveis (Mensal)"
-                  value={empresaData.despesas_variaveis_mensal}
-                  onChange={(v: number | null) =>
-                    setEmpresaData((p) => ({ ...p, despesas_variaveis_mensal: v }))
-                  }
-                />
+                <div
+                  className={cn(
+                    'rounded-lg transition-colors p-1',
+                    empresaData.faturamento_anual === null
+                      ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50'
+                      : '',
+                  )}
+                >
+                  <MoneyField
+                    label="Faturamento Anual"
+                    value={empresaData.faturamento_anual}
+                    onChange={(v: number | null) =>
+                      setEmpresaData((p) => ({ ...p, faturamento_anual: v }))
+                    }
+                  />
+                  {empresaData.faturamento_anual === null && (
+                    <span className="text-xs text-amber-600 dark:text-amber-500 mt-1 ml-1 block font-medium">
+                      Extração falhou. Preencha manualmente.
+                    </span>
+                  )}
+                </div>
+                <div
+                  className={cn(
+                    'rounded-lg transition-colors p-1',
+                    empresaData.impostos_mensal === null
+                      ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50'
+                      : '',
+                  )}
+                >
+                  <MoneyField
+                    label="Impostos (Mensal)"
+                    value={empresaData.impostos_mensal}
+                    onChange={(v: number | null) =>
+                      setEmpresaData((p) => ({ ...p, impostos_mensal: v }))
+                    }
+                  />
+                  {empresaData.impostos_mensal === null && (
+                    <span className="text-xs text-amber-600 dark:text-amber-500 mt-1 ml-1 block font-medium">
+                      Extração falhou. Preencha manualmente.
+                    </span>
+                  )}
+                </div>
+                <div
+                  className={cn(
+                    'rounded-lg transition-colors p-1',
+                    empresaData.salarios_mensal === null
+                      ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50'
+                      : '',
+                  )}
+                >
+                  <MoneyField
+                    label="Salários (Mensal)"
+                    value={empresaData.salarios_mensal}
+                    onChange={(v: number | null) =>
+                      setEmpresaData((p) => ({ ...p, salarios_mensal: v }))
+                    }
+                  />
+                  {empresaData.salarios_mensal === null && (
+                    <span className="text-xs text-amber-600 dark:text-amber-500 mt-1 ml-1 block font-medium">
+                      Extração falhou. Preencha manualmente.
+                    </span>
+                  )}
+                </div>
+                <div
+                  className={cn(
+                    'rounded-lg transition-colors p-1',
+                    empresaData.despesas_variaveis_mensal === null
+                      ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50'
+                      : '',
+                  )}
+                >
+                  <MoneyField
+                    label="Despesas Variáveis (Mensal)"
+                    value={empresaData.despesas_variaveis_mensal}
+                    onChange={(v: number | null) =>
+                      setEmpresaData((p) => ({ ...p, despesas_variaveis_mensal: v }))
+                    }
+                  />
+                  {empresaData.despesas_variaveis_mensal === null && (
+                    <span className="text-xs text-amber-600 dark:text-amber-500 mt-1 ml-1 block font-medium">
+                      Extração falhou. Preencha manualmente.
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="pt-6 border-t border-slate-200 dark:border-slate-800">
@@ -449,27 +533,69 @@ export default function Upload() {
                   documentos.
                 </p>{' '}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <MoneyField
-                    label="Capital de Giro Líquido (CDG)"
-                    value={empresaData.fleuriet_cdg}
-                    onChange={(v: number | null) =>
-                      setEmpresaData((p) => ({ ...p, fleuriet_cdg: v }))
-                    }
-                  />
-                  <MoneyField
-                    label="Necessidade de Giro (NIG)"
-                    value={empresaData.fleuriet_nig}
-                    onChange={(v: number | null) =>
-                      setEmpresaData((p) => ({ ...p, fleuriet_nig: v }))
-                    }
-                  />
-                  <MoneyField
-                    label="Saldo de Tesouraria (ST)"
-                    value={empresaData.fleuriet_st}
-                    onChange={(v: number | null) =>
-                      setEmpresaData((p) => ({ ...p, fleuriet_st: v }))
-                    }
-                  />
+                  <div
+                    className={cn(
+                      'rounded-lg transition-colors p-1',
+                      empresaData.fleuriet_cdg === null
+                        ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50'
+                        : '',
+                    )}
+                  >
+                    <MoneyField
+                      label="Capital de Giro Líquido (CDG)"
+                      value={empresaData.fleuriet_cdg}
+                      onChange={(v: number | null) =>
+                        setEmpresaData((p) => ({ ...p, fleuriet_cdg: v }))
+                      }
+                    />
+                    {empresaData.fleuriet_cdg === null && (
+                      <span className="text-xs text-amber-600 dark:text-amber-500 mt-1 ml-1 block font-medium">
+                        Dados insuficientes.
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className={cn(
+                      'rounded-lg transition-colors p-1',
+                      empresaData.fleuriet_nig === null
+                        ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50'
+                        : '',
+                    )}
+                  >
+                    <MoneyField
+                      label="Necessidade de Giro (NIG)"
+                      value={empresaData.fleuriet_nig}
+                      onChange={(v: number | null) =>
+                        setEmpresaData((p) => ({ ...p, fleuriet_nig: v }))
+                      }
+                    />
+                    {empresaData.fleuriet_nig === null && (
+                      <span className="text-xs text-amber-600 dark:text-amber-500 mt-1 ml-1 block font-medium">
+                        Dados insuficientes.
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className={cn(
+                      'rounded-lg transition-colors p-1',
+                      empresaData.fleuriet_st === null
+                        ? 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50'
+                        : '',
+                    )}
+                  >
+                    <MoneyField
+                      label="Saldo de Tesouraria (ST)"
+                      value={empresaData.fleuriet_st}
+                      onChange={(v: number | null) =>
+                        setEmpresaData((p) => ({ ...p, fleuriet_st: v }))
+                      }
+                    />
+                    {empresaData.fleuriet_st === null && (
+                      <span className="text-xs text-amber-600 dark:text-amber-500 mt-1 ml-1 block font-medium">
+                        Dados insuficientes.
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>

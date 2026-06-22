@@ -114,7 +114,12 @@ Formato esperado do JSON:
     "fluxo_investimento": number | null,
     "fluxo_financiamento": number | null,
     "saldo_inicial": number | null,
-    "saldo_final": number | null
+    "saldo_final": number | null,
+    "impostos_mensal": number | null,
+    "salarios_mensal": number | null,
+    "aluguel_mensal": number | null,
+    "outras_despesas_fixas_mensal": number | null,
+    "despesas_variaveis_mensal": number | null
   }
 }`,
     })

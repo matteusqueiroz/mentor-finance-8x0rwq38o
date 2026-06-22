@@ -124,59 +124,90 @@ export default function Documentos() {
 
     try {
       for (const file of selectedFiles) {
-        const fileExt = file.name.split('.').pop()
-        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
-        const filePath = `${user.id}/${fileName}`
-
-        // 1. Upload to Supabase Storage
-        const { error: uploadError } = await supabase.storage
-          .from('documentos')
-          .upload(filePath, file)
-
-        if (uploadError) throw uploadError
-
-        const { data: publicUrlData } = supabase.storage.from('documentos').getPublicUrl(filePath)
-
-        // 2. Insert into DB
-        const { data: doc, error: insertError } = await supabase
+        // Idempotent Analysis Check
+        const { data: existingDocs } = await supabase
           .from('documentos_contabeis')
-          .insert({
-            user_id: user.id,
-            empresa_id: empresaId,
-            nome_arquivo: file.name,
-            url_arquivo: publicUrlData.publicUrl,
-            tipo_documento: file.type,
-            status: 'pendente',
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('nome_arquivo', file.name)
+          .eq('status', 'processado')
+          .order('criado_em', { ascending: false })
+          .limit(1)
+
+        let docRecord
+        let finalAnalysisData
+
+        if (existingDocs && existingDocs.length > 0 && existingDocs[0].analise_ia) {
+          docRecord = existingDocs[0]
+          finalAnalysisData = { analysis: existingDocs[0].analise_ia }
+
+          toast({
+            title: 'Análise Existente',
+            description: `${file.name} já foi processado anteriormente.`,
           })
-          .select()
-          .single()
+        } else {
+          const fileExt = file.name.split('.').pop()
+          const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+          const filePath = `${user.id}/${fileName}`
 
-        if (insertError) throw insertError
+          // 1. Upload to Supabase Storage
+          const { error: uploadError } = await supabase.storage
+            .from('documentos')
+            .upload(filePath, file)
 
-        toast({
-          title: 'Enviado',
-          description: `${file.name} enviado. Iniciando análise...`,
-        })
+          if (uploadError) throw uploadError
 
-        // 3. Analyze document via Edge Function
-        const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
-          'analyze-document',
-          {
-            body: { documentUrl: publicUrlData.publicUrl, fileName: file.name, documentId: doc.id },
-          },
-        )
+          const { data: publicUrlData } = supabase.storage.from('documentos').getPublicUrl(filePath)
 
-        if (analysisError) {
-          await supabase.from('documentos_contabeis').update({ status: 'erro' }).eq('id', doc.id)
-          throw analysisError
+          // 2. Insert into DB
+          const { data: doc, error: insertError } = await supabase
+            .from('documentos_contabeis')
+            .insert({
+              user_id: user.id,
+              empresa_id: empresaId,
+              nome_arquivo: file.name,
+              url_arquivo: publicUrlData.publicUrl,
+              tipo_documento: file.type,
+              status: 'pendente',
+            })
+            .select()
+            .single()
+
+          if (insertError) throw insertError
+
+          docRecord = doc
+
+          toast({
+            title: 'Enviado',
+            description: `${file.name} enviado. Iniciando análise...`,
+          })
+
+          // 3. Analyze document via Edge Function
+          const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
+            'analyze-document',
+            {
+              body: {
+                documentUrl: publicUrlData.publicUrl,
+                fileName: file.name,
+                documentId: doc.id,
+              },
+            },
+          )
+
+          if (analysisError) {
+            await supabase.from('documentos_contabeis').update({ status: 'erro' }).eq('id', doc.id)
+            throw analysisError
+          }
+          finalAnalysisData = analysisData
         }
 
-        let finalStatus = 'processado'
+        let finalStatus = docRecord.status === 'enviado' ? 'enviado' : 'processado'
 
-        if (emailContabilidade) {
+        // Only send to accountant if it hasn't been sent yet
+        if (emailContabilidade && docRecord.status !== 'enviado') {
           // 4. Send to Accountant if configured
           const { error: sendError } = await supabase.functions.invoke('send-accounting-email', {
-            body: { record: doc },
+            body: { record: docRecord },
           })
 
           if (sendError) {
@@ -193,7 +224,7 @@ export default function Documentos() {
               description: `${file.name} analisado e enviado à contabilidade.`,
             })
           }
-        } else {
+        } else if (docRecord.status !== 'enviado') {
           toast({
             title: 'Processado',
             description: `${file.name} analisado.`,
@@ -205,9 +236,9 @@ export default function Documentos() {
           .from('documentos_contabeis')
           .update({
             status: finalStatus,
-            analise_ia: analysisData?.analysis,
+            analise_ia: finalAnalysisData?.analysis,
           })
-          .eq('id', doc.id)
+          .eq('id', docRecord.id)
       }
     } catch (error: any) {
       toast({
@@ -241,6 +272,7 @@ export default function Documentos() {
             className="hidden"
             ref={fileInputRef}
             onChange={handleFileUpload}
+            onClick={(e) => e.stopPropagation()}
             disabled={uploading}
             multiple
           />
@@ -251,6 +283,7 @@ export default function Documentos() {
             className="hidden"
             ref={cameraInputRef}
             onChange={handleFileUpload}
+            onClick={(e) => e.stopPropagation()}
             disabled={uploading}
           />
 
