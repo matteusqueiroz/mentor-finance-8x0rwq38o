@@ -1,5 +1,6 @@
 {
   "_versions": {
-    "analyze-document": 2
+    "analyze-document": 2,
+    "generate-report": 1
   }
 }
