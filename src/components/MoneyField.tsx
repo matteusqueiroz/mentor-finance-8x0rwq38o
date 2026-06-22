@@ -51,21 +51,21 @@ export function MoneyField({ label, value, onChange, error }: MoneyFieldProps) {
 
   return (
     <label className="flex flex-col gap-1.5 w-full">
-      <span className="text-sm font-medium text-slate-300">{label}</span>
+      <span className="text-sm font-medium text-foreground">{label}</span>
       <div
-        className={`flex items-center rounded-lg border bg-slate-900/50 px-3 transition-colors ${error ? 'border-red-500' : 'border-slate-700 hover:border-slate-500 focus-within:border-blue-500 shadow-sm'}`}
+        className={`flex items-center rounded-lg border bg-background px-3 transition-colors duration-200 ${error ? 'border-destructive' : 'border-input hover:border-ring focus-within:border-ring focus-within:ring-1 focus-within:ring-ring shadow-sm'}`}
       >
-        <span className="text-slate-500 mr-2 font-medium">R$</span>
+        <span className="text-muted-foreground mr-2 font-medium">R$</span>
         <input
           inputMode="decimal"
           value={display}
           onChange={handleChange}
           onBlur={handleBlur}
-          className="flex-1 bg-transparent py-2.5 text-slate-100 outline-none w-full placeholder:text-slate-600"
+          className="flex-1 bg-transparent py-2.5 text-foreground outline-none w-full placeholder:text-muted-foreground"
           placeholder="0,00"
         />
       </div>
-      {error && <span className="text-xs text-red-500 mt-0.5 font-medium">{error}</span>}
+      {error && <span className="text-xs text-destructive mt-0.5 font-medium">{error}</span>}
     </label>
   )
 }

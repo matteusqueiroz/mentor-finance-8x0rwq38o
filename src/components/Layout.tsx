@@ -1,58 +1,67 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { Briefcase, Settings, ShieldCheck } from 'lucide-react'
+import { Briefcase, Settings, ShieldCheck, Moon, Sun } from 'lucide-react'
+import { useTheme } from '@/components/theme-provider'
 
 export default function Layout() {
   const location = useLocation()
+  const { theme, setTheme } = useTheme()
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col font-sans">
-      <header className="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-50 backdrop-blur-md">
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-300">
+      <header className="border-b border-border bg-background/80 sticky top-0 z-50 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-            <div className="bg-blue-600 p-1.5 rounded-lg">
-              <Briefcase className="h-5 w-5 text-white" />
+            <div className="bg-primary p-1.5 rounded-lg">
+              <Briefcase className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-slate-100">
-              Mentor<span className="text-blue-500">Finance</span>
+            <span className="text-foreground">
+              Mentor<span className="text-primary">Finance</span>
             </span>
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
             <Link
               to="/"
-              className={`hover:text-blue-400 transition-colors ${location.pathname === '/' || location.pathname.startsWith('/onboarding') ? 'text-blue-500' : 'text-slate-400'}`}
+              className={`hover:text-primary transition-colors ${location.pathname === '/' || location.pathname.startsWith('/onboarding') ? 'text-primary' : 'text-muted-foreground'}`}
             >
               Onboarding
             </Link>
             <Link
               to="/dashboard"
-              className={`hover:text-blue-400 transition-colors ${location.pathname === '/dashboard' ? 'text-blue-500' : 'text-slate-400'}`}
+              className={`hover:text-primary transition-colors ${location.pathname === '/dashboard' ? 'text-primary' : 'text-muted-foreground'}`}
             >
               Dashboard
             </Link>
             <Link
               to="/diagnostico"
-              className={`hover:text-blue-400 transition-colors ${location.pathname === '/diagnostico' ? 'text-blue-500' : 'text-slate-400'}`}
+              className={`hover:text-primary transition-colors ${location.pathname === '/diagnostico' ? 'text-primary' : 'text-muted-foreground'}`}
             >
               Diagnóstico
             </Link>
             <Link
               to="/plano"
-              className={`hover:text-blue-400 transition-colors ${location.pathname === '/plano' ? 'text-blue-500' : 'text-slate-400'}`}
+              className={`hover:text-primary transition-colors ${location.pathname === '/plano' ? 'text-primary' : 'text-muted-foreground'}`}
             >
               Plano de Ação
             </Link>
-            <div className="h-4 w-px bg-slate-800 mx-2" />
+            <div className="h-4 w-px bg-border mx-2" />
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              title="Alternar Tema"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-muted"
+            >
+              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </button>
             <Link
               to="/privacidade"
               title="Privacidade (LGPD)"
-              className="text-slate-500 hover:text-slate-300"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-muted"
             >
               <ShieldCheck className="h-5 w-5" />
             </Link>
             <Link
               to="/configuracoes"
               title="Configurações"
-              className="text-slate-500 hover:text-slate-300"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-muted"
             >
               <Settings className="h-5 w-5" />
             </Link>

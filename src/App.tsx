@@ -10,6 +10,7 @@ import Organizacao from './pages/Organizacao'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import { FinanceProvider } from './stores/use-finance-store'
+import { ThemeProvider } from './components/theme-provider'
 
 import UploadFlow from './pages/onboarding/Upload'
 import EstimativaFlow from './pages/onboarding/Estimativa'
@@ -20,33 +21,35 @@ import Privacidade from './pages/Privacidade'
 import Configuracoes from './pages/Configuracoes'
 
 const App = () => (
-  <FinanceProvider>
-    <BrowserRouter>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Index />} />
+  <ThemeProvider defaultTheme="light" storageKey="mentor-finance-theme">
+    <FinanceProvider>
+      <BrowserRouter>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Index />} />
 
-            <Route path="/onboarding/upload" element={<UploadFlow />} />
-            <Route path="/onboarding/estimativa" element={<EstimativaFlow />} />
-            <Route path="/onboarding/profissional" element={<ProfissionalFlow />} />
-            <Route path="/onboarding/template" element={<TemplateFlow />} />
+              <Route path="/onboarding/upload" element={<UploadFlow />} />
+              <Route path="/onboarding/estimativa" element={<EstimativaFlow />} />
+              <Route path="/onboarding/profissional" element={<ProfissionalFlow />} />
+              <Route path="/onboarding/template" element={<TemplateFlow />} />
 
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/diagnostico" element={<Diagnostico />} />
-            <Route path="/plano" element={<PlanoAcao />} />
-            <Route path="/organizacao" element={<Organizacao />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/diagnostico" element={<Diagnostico />} />
+              <Route path="/plano" element={<PlanoAcao />} />
+              <Route path="/organizacao" element={<Organizacao />} />
 
-            <Route path="/privacidade" element={<Privacidade />} />
-            <Route path="/configuracoes" element={<Configuracoes />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </TooltipProvider>
-    </BrowserRouter>
-  </FinanceProvider>
+              <Route path="/privacidade" element={<Privacidade />} />
+              <Route path="/configuracoes" element={<Configuracoes />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </TooltipProvider>
+      </BrowserRouter>
+    </FinanceProvider>
+  </ThemeProvider>
 )
 
 export default App
