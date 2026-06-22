@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Download, FileText, DollarSign, BarChart3, Landmark, TrendingUp } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
-import { Area, AreaChart, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { Download, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/lib/supabase/client'
 
+import { OverviewTab } from '@/components/dashboard/OverviewTab'
+import { SimulatorTab } from '@/components/dashboard/SimulatorTab'
+import { ReportsTab } from '@/components/dashboard/ReportsTab'
+
 export default function Dashboard() {
   const { user } = useAuth()
   const { toast } = useToast()
+
   const [data, setData] = useState<any[]>([])
   const [stats, setStats] = useState({
     ytdRevenue: 0,
@@ -122,137 +125,45 @@ export default function Dashboard() {
     <div className="space-y-8 p-4 md:p-8 animate-slide-up max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard de Resultados</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Acompanhe seus indicadores e exporte seus relatórios.
+            Acompanhe indicadores, simule cenários e gere relatórios.
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleExportCSV} className="shadow-sm">
-            <Download className="mr-2 h-4 w-4" /> Exportar CSV
+            <Download className="mr-2 h-4 w-4" /> CSV
           </Button>
           <Button variant="outline" onClick={handleExportPDF} className="shadow-sm">
-            <FileText className="mr-2 h-4 w-4" /> Exportar PDF
+            <FileText className="mr-2 h-4 w-4" /> PDF
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="shadow-sm border-border/50">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Revenue (YTD)
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.ytdRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-border/50">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Average Monthly Result
-            </CardTitle>
-            <BarChart3 className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.avgResult.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-border/50">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Latest Valuation
-            </CardTitle>
-            <Landmark className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.latestValuation.toLocaleString('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-              })}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm border-border/50">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Último Faturamento
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.latestFaturamento.toLocaleString('pt-BR', {
-                style: 'currency',
-                currency: 'BRL',
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Tabs defaultValue="overview" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+          <TabsTrigger value="simulador">Simulador</TabsTrigger>
+          <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
+        </TabsList>
 
-      <Card className="shadow-sm border-border/50">
-        <CardHeader>
-          <CardTitle>Evolução Financeira</CardTitle>
-          <CardDescription>Faturamento Realizado e Resultado ao longo do tempo</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[350px] w-full mt-4">
-            <ChartContainer
-              config={{
-                faturamento: { label: 'Faturamento', color: 'hsl(var(--primary))' },
-                resultado: { label: 'Resultado', color: 'hsl(var(--secondary))' },
-              }}
-              className="h-full w-full"
-            >
-              <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  stroke="hsl(var(--border))"
-                  opacity={0.5}
-                />
-                <XAxis
-                  dataKey="mes"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                />
-                <YAxis
-                  tickFormatter={(v) => `R$ ${v / 1000}k`}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Area
-                  type="monotone"
-                  dataKey="faturamento"
-                  stroke="var(--color-faturamento)"
-                  fill="var(--color-faturamento)"
-                  fillOpacity={0.15}
-                  strokeWidth={3}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="resultado"
-                  stroke="var(--color-resultado)"
-                  fill="var(--color-resultado)"
-                  fillOpacity={0.15}
-                  strokeWidth={3}
-                />
-              </AreaChart>
-            </ChartContainer>
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="overview" className="focus-visible:outline-none">
+          <OverviewTab stats={stats} data={data} />
+        </TabsContent>
+
+        <TabsContent value="simulador" className="focus-visible:outline-none">
+          <SimulatorTab
+            baseValuation={stats.latestValuation}
+            onSaveValuation={(newValuation) =>
+              setStats((prev) => ({ ...prev, latestValuation: newValuation }))
+            }
+          />
+        </TabsContent>
+
+        <TabsContent value="relatorios" className="focus-visible:outline-none">
+          <ReportsTab />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
