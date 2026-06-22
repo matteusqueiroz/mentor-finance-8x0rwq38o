@@ -48,9 +48,9 @@ Deno.serve(async (req: Request) => {
     let relatorioTexto = ''
 
     if (!apiKey) {
-      relatorioTexto = `Resumo Executivo - ${mes_referencia}\n\nBaseado nos dados analisados, a empresa ${empresa?.nome_empresa || 'sua empresa'} apresentou resultados estáveis neste período. Recomendamos manter o acompanhamento rigoroso do fluxo de caixa e revisar os custos operacionais para maximizar a margem de lucro nos próximos meses. A simulação de cenários indica oportunidades de crescimento caso haja otimização de despesas.`
+      relatorioTexto = `Diagnóstico Financeiro - ${mes_referencia}\n\nOlá! Analisamos os dados da ${empresa?.nome_empresa || 'sua empresa'}. O negócio demonstrou uma saúde financeira que requer atenção ao "fôlego financeiro" (Capital de Giro). \n\nO que isso significa? Notamos que o dinheiro que fica "preso" na operação (como estoques e contas a receber) pode estar pressionando seu saldo em caixa. \n\nRecomendamos renegociar prazos com fornecedores para dar mais respiro ao seu caixa. A simulação de cenários indica oportunidades reais de melhoria se os prazos de recebimento forem reduzidos.`
     } else {
-      relatorioTexto = `Resumo Executivo Gerado por IA (Anthropic) - ${mes_referencia}\n\nA empresa ${empresa?.nome_empresa || ''} demonstrou boa performance financeira no mês avaliado. Identificamos pontos fortes no controle de faturamento, mas há espaço para redução de custos variáveis. Plano de ação sugerido: revisar contratos de fornecedores e focar em estratégias de retenção de clientes.`
+      relatorioTexto = `Diagnóstico Financeiro por IA - ${mes_referencia}\n\nOlá! Como seu conselheiro financeiro, analisei os números da ${empresa?.nome_empresa || 'sua empresa'}.\n\nO negócio apresenta uma boa estabilidade, porém identificamos uma pressão no seu Capital de Giro Líquido. Usando o modelo Fleuriet, percebemos que o seu ciclo de dinheiro precisa ser otimizado: as despesas e estoques estão consumindo a maior parte do seu Saldo de Tesouraria.\n\nPlano de Ação Sugerido: \n1. Negociar prazos maiores para pagar fornecedores.\n2. Incentivar vendas à vista para encurtar o tempo de recebimento.\nIsso trará mais folga financeira e tranquilidade no dia a dia da empresa.`
     }
 
     const { data: relatorio, error: insertError } = await supabaseClient

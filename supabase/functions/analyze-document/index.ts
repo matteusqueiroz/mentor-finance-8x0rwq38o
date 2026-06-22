@@ -103,6 +103,8 @@ Campos esperados:
   "estoques": number | null,
   "contas_a_receber": number | null,
   "fornecedores": number | null,
+  "ativo_circulante_operacional": number | null,
+  "passivo_circulante_operacional": number | null,
   "fluxo_operacional": number | null,
   "fluxo_investimento": number | null,
   "fluxo_financiamento": number | null,
