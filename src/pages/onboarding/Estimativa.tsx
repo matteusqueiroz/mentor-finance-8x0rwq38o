@@ -1,17 +1,33 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { MoneyField } from '@/components/MoneyField'
 import { useOnboardingStore, onboardingActions } from '@/stores/use-onboarding-store'
 import { Lightbulb, ArrowRight } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
+import { saveDiagnostico } from '@/services/db'
+import { useToast } from '@/hooks/use-toast'
 
 export default function Estimativa() {
   const { demonstrativos } = useOnboardingStore()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const { toast } = useToast()
+  const [isSaving, setIsSaving] = useState(false)
 
-  const handleSave = () => {
-    onboardingActions.setOrigemConfiabilidade('estimado')
-    navigate('/diagnostico')
+  const handleSave = async () => {
+    if (!user) return
+    setIsSaving(true)
+    try {
+      await saveDiagnostico(user.id, 'Empresa (Estimativa)', demonstrativos)
+      onboardingActions.setOrigemConfiabilidade('estimado')
+      navigate('/diagnostico')
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const { dre, balanco } = demonstrativos
@@ -106,8 +122,13 @@ export default function Estimativa() {
         >
           Cancelar
         </Button>
-        <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white" size="lg">
-          Ver Meu Diagnóstico <ArrowRight className="ml-2 h-5 w-5" />
+        <Button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+          size="lg"
+        >
+          {isSaving ? 'Salvando...' : 'Ver Meu Diagnóstico'} <ArrowRight className="ml-2 h-5 w-5" />
         </Button>
       </div>
     </div>

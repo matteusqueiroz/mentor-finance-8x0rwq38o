@@ -5,15 +5,31 @@ import { Button } from '@/components/ui/button'
 import { useOnboardingStore } from '@/stores/use-onboarding-store'
 import { calcularKPIs, gerarDiagnosticoIA, Indicador } from '@/lib/motor-de-confianca'
 import { Link } from 'react-router-dom'
+import { useAuth } from '@/hooks/use-auth'
+import { getLatestDiagnostico } from '@/services/db'
 
 export default function Diagnostico() {
   const { demonstrativos, origemConfiabilidade } = useOnboardingStore()
+  const { user } = useAuth()
   const [isProcessing, setIsProcessing] = useState(true)
   const [diagnostico, setDiagnostico] = useState<{ narrativa: string; pontuacao: number } | null>(
     null,
   )
+  const [dbDemonstrativos, setDbDemonstrativos] = useState<any>(demonstrativos)
 
-  const kpis = useMemo(() => calcularKPIs(demonstrativos), [demonstrativos])
+  useEffect(() => {
+    if (user) {
+      getLatestDiagnostico(user.id)
+        .then((diag) => {
+          if (diag && diag.dados) {
+            setDbDemonstrativos(diag.dados)
+          }
+        })
+        .catch(console.error)
+    }
+  }, [user])
+
+  const kpis = useMemo(() => calcularKPIs(dbDemonstrativos), [dbDemonstrativos])
 
   useEffect(() => {
     gerarDiagnosticoIA(kpis, origemConfiabilidade).then((res) => {

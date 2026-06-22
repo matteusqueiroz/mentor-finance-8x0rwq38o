@@ -9,11 +9,17 @@ import {
   onboardingActions,
   Demonstrativos,
 } from '@/stores/use-onboarding-store'
+import { useAuth } from '@/hooks/use-auth'
+import { saveDiagnostico } from '@/services/db'
+import { useToast } from '@/hooks/use-toast'
 
 export default function Upload() {
   const { demonstrativos } = useOnboardingStore()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const { toast } = useToast()
   const [step, setStep] = useState<'upload' | 'processing' | 'validation'>('upload')
+  const [isSaving, setIsSaving] = useState(false)
 
   const handleUpload = () => {
     setStep('processing')
@@ -34,9 +40,18 @@ export default function Upload() {
     }, 2500)
   }
 
-  const handleConfirm = () => {
-    onboardingActions.setOrigemConfiabilidade('extraido')
-    navigate('/diagnostico')
+  const handleConfirm = async () => {
+    if (!user) return
+    setIsSaving(true)
+    try {
+      await saveDiagnostico(user.id, 'Empresa (Upload)', demonstrativos)
+      onboardingActions.setOrigemConfiabilidade('extraido')
+      navigate('/diagnostico')
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -150,8 +165,10 @@ export default function Upload() {
               onClick={handleConfirm}
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
               size="lg"
+              disabled={isSaving}
             >
-              Confirmar Dados <CheckCircle2 className="ml-2 h-5 w-5" />
+              {isSaving ? 'Salvando...' : 'Confirmar Dados'}{' '}
+              <CheckCircle2 className="ml-2 h-5 w-5" />
             </Button>
           </div>
         </div>

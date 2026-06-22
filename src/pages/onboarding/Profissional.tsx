@@ -5,13 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { MoneyField } from '@/components/MoneyField'
 import { useOnboardingStore, onboardingActions } from '@/stores/use-onboarding-store'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { useAuth } from '@/hooks/use-auth'
+import { saveDiagnostico } from '@/services/db'
+import { useToast } from '@/hooks/use-toast'
 
 export default function Profissional() {
   const { demonstrativos } = useOnboardingStore()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const { balanco } = demonstrativos
     const ativoTotal = balanco.ativoTotal || 0
     const passivoTotal = balanco.passivoTotal || 0
@@ -28,8 +34,17 @@ export default function Profissional() {
     }
 
     setError(null)
-    onboardingActions.setOrigemConfiabilidade('informado')
-    navigate('/diagnostico')
+    if (!user) return
+    setIsSaving(true)
+    try {
+      await saveDiagnostico(user.id, 'Empresa (Profissional)', demonstrativos)
+      onboardingActions.setOrigemConfiabilidade('informado')
+      navigate('/diagnostico')
+    } catch (err: any) {
+      toast({ title: 'Erro', description: err.message, variant: 'destructive' })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -190,8 +205,13 @@ export default function Profissional() {
         >
           Cancelar
         </Button>
-        <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 text-white">
-          Validar e Gerar Diagnóstico <CheckCircle2 className="ml-2 h-4 w-4" />
+        <Button
+          onClick={handleSave}
+          disabled={isSaving}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+        >
+          {isSaving ? 'Salvando...' : 'Validar e Gerar Diagnóstico'}{' '}
+          <CheckCircle2 className="ml-2 h-4 w-4" />
         </Button>
       </div>
     </div>

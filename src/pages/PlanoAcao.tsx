@@ -1,16 +1,31 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import useFinanceStore from '@/stores/use-finance-store'
 import { TarefaCard } from '@/components/TarefaCard'
+import { useAuth } from '@/hooks/use-auth'
+import { getLatestDiagnostico } from '@/services/db'
 
 export default function PlanoAcao() {
-  const { tasks, registrarValorRealizado } = useFinanceStore()
+  const { tasks: fallbackTasks, registrarValorRealizado } = useFinanceStore()
+  const { user } = useAuth()
+  const [tasks, setTasks] = useState<any[]>(fallbackTasks)
+
+  useEffect(() => {
+    if (!user) return
+    getLatestDiagnostico(user.id)
+      .then((diag) => {
+        if (diag && diag.plano_acao && Array.isArray(diag.plano_acao)) {
+          setTasks(diag.plano_acao)
+        }
+      })
+      .catch(console.error)
+  }, [user])
 
   const completedTasks = tasks.filter(
     (t) => t.status === 'concluida' || t.status === 'concluida_com_atraso',
   ).length
-  const progressPercent = Math.round((completedTasks / tasks.length) * 100) || 0
+  const progressPercent = Math.round((completedTasks / (tasks.length || 1)) * 100) || 0
 
   return (
     <div className="space-y-8 animate-fade-in max-w-5xl mx-auto py-6 px-4">

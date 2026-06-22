@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import {
   ArrowUpRight,
   ArrowDownRight,
@@ -14,8 +14,10 @@ import { Area, AreaChart, XAxis, YAxis } from 'recharts'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import useFinanceStore from '@/stores/use-finance-store'
+import { useAuth } from '@/hooks/use-auth'
+import { getAcompanhamentos } from '@/services/db'
 
-const cashFlowData = [
+const fallbackCashFlowData = [
   { day: '01', in: 4000, out: 2400 },
   { day: '05', in: 3000, out: 1398 },
   { day: '10', in: 2000, out: 9800 },
@@ -26,7 +28,40 @@ const cashFlowData = [
 ]
 
 export default function Dashboard() {
+  const { user } = useAuth()
   const { transactions } = useFinanceStore()
+  const [cashFlowData, setCashFlowData] = useState(fallbackCashFlowData)
+  const [stats, setStats] = useState({
+    saldo: 24500,
+    receitas: 45231.89,
+    despesas: 32100.5,
+    lucro: 13131.39,
+  })
+
+  useEffect(() => {
+    if (!user) return
+    getAcompanhamentos(user.id)
+      .then((data) => {
+        if (data && data.length > 0) {
+          const mapped = data.map((d: any, i: number) => ({
+            day: d.mes_referencia || `M${i + 1}`,
+            in: d.faturamento_realizado || 0,
+            out: (d.faturamento_realizado || 0) - (d.resultado_valor || 0),
+          }))
+          if (mapped.length > 0) setCashFlowData(mapped)
+
+          const latest = data[data.length - 1]
+          setStats({
+            saldo: latest.resultado_valor || 24500,
+            receitas: latest.faturamento_realizado || 45231.89,
+            despesas:
+              (latest.faturamento_realizado || 0) - (latest.resultado_valor || 0) || 32100.5,
+            lucro: latest.resultado_valor || 13131.39,
+          })
+        }
+      })
+      .catch(console.error)
+  }, [user])
 
   const chartConfig = {
     in: { label: 'Receitas', color: 'hsl(var(--primary))' },
@@ -56,7 +91,9 @@ export default function Dashboard() {
             <DollarSign className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 24.500,00</div>
+            <div className="text-2xl font-bold">
+              {stats.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <TrendingUp className="h-3 w-3 mr-1 text-primary" />
               <span className="text-primary font-medium">+12%</span> em relação ao mês anterior
@@ -71,7 +108,9 @@ export default function Dashboard() {
             <ArrowUpRight className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 45.231,89</div>
+            <div className="text-2xl font-bold">
+              {stats.receitas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               Rumo à meta de R$ 50k
             </p>
@@ -86,7 +125,9 @@ export default function Dashboard() {
             <ArrowDownRight className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 32.100,50</div>
+            <div className="text-2xl font-bold">
+              {stats.despesas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
             <p className="text-xs text-muted-foreground flex items-center mt-1">
               <Activity className="h-3 w-3 mr-1 text-destructive" />
               <span className="text-destructive font-medium">+4%</span> vs. orçado
@@ -101,7 +142,9 @@ export default function Dashboard() {
             <Target className="h-4 w-4 text-secondary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">R$ 13.131,39</div>
+            <div className="text-2xl font-bold text-primary">
+              {stats.lucro.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">Margem de lucro atual: 29%</p>
           </CardContent>
         </Card>

@@ -19,37 +19,64 @@ import TemplateFlow from './pages/onboarding/Template'
 
 import Privacidade from './pages/Privacidade'
 import Configuracoes from './pages/Configuracoes'
+import Login from './pages/Login'
+import { AuthProvider, useAuth } from './hooks/use-auth'
+import { Navigate, useLocation } from 'react-router-dom'
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  const location = useLocation()
+
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center">Carregando...</div>
+  }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  return <>{children}</>
+}
 
 const App = () => (
-  <ThemeProvider defaultTheme="light" storageKey="mentor-finance-theme">
-    <FinanceProvider>
-      <BrowserRouter>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Index />} />
+  <AuthProvider>
+    <ThemeProvider defaultTheme="light" storageKey="mentor-finance-theme">
+      <FinanceProvider>
+        <BrowserRouter>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/" element={<Index />} />
 
-              <Route path="/onboarding/upload" element={<UploadFlow />} />
-              <Route path="/onboarding/estimativa" element={<EstimativaFlow />} />
-              <Route path="/onboarding/profissional" element={<ProfissionalFlow />} />
-              <Route path="/onboarding/template" element={<TemplateFlow />} />
+                <Route path="/onboarding/upload" element={<UploadFlow />} />
+                <Route path="/onboarding/estimativa" element={<EstimativaFlow />} />
+                <Route path="/onboarding/profissional" element={<ProfissionalFlow />} />
+                <Route path="/onboarding/template" element={<TemplateFlow />} />
 
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/diagnostico" element={<Diagnostico />} />
-              <Route path="/plano" element={<PlanoAcao />} />
-              <Route path="/organizacao" element={<Organizacao />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/diagnostico" element={<Diagnostico />} />
+                <Route path="/plano" element={<PlanoAcao />} />
+                <Route path="/organizacao" element={<Organizacao />} />
 
-              <Route path="/privacidade" element={<Privacidade />} />
-              <Route path="/configuracoes" element={<Configuracoes />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </TooltipProvider>
-      </BrowserRouter>
-    </FinanceProvider>
-  </ThemeProvider>
+                <Route path="/privacidade" element={<Privacidade />} />
+                <Route path="/configuracoes" element={<Configuracoes />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TooltipProvider>
+        </BrowserRouter>
+      </FinanceProvider>
+    </ThemeProvider>
+  </AuthProvider>
 )
 
 export default App
