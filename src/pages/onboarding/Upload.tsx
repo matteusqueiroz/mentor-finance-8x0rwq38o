@@ -45,33 +45,80 @@ export default function Upload() {
 
       const { data: publicUrlData } = supabase.storage.from('documentos').getPublicUrl(filePath)
 
+      // 2. Insert DB record
+      const { data: docRecord, error: dbError } = await supabase
+        .from('documentos_contabeis')
+        .insert({
+          user_id: user.id,
+          nome_arquivo: file.name,
+          url_arquivo: publicUrlData.publicUrl,
+          tipo_documento: file.type,
+          status: 'pendente',
+        })
+        .select()
+        .single()
+
+      if (dbError) throw dbError
+
+      // 3. Analyze document via Edge Function
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
         'analyze-document',
         {
-          body: { documentText: `Analisando documento onboarding: ${publicUrlData.publicUrl}` },
+          body: {
+            documentUrl: publicUrlData.publicUrl,
+            fileName: file.name,
+            documentId: docRecord.id,
+          },
         },
       )
 
-      if (analysisError) throw analysisError
+      if (analysisError) {
+        await supabase
+          .from('documentos_contabeis')
+          .update({ status: 'erro' })
+          .eq('id', docRecord.id)
+        throw analysisError
+      }
+
+      await supabase
+        .from('documentos_contabeis')
+        .update({
+          status: 'processado',
+          analise_ia: analysisData?.analysis,
+        })
+        .eq('id', docRecord.id)
 
       const extracted = analysisData?.analysis?.extracted_data || {}
 
       onboardingActions.preencherDeExtracao({
         dre: {
-          ...demonstrativos.dre,
-          receitaLiquida: extracted.receita_liquida || 150000,
-          cmv: 60000,
-          lucroLiquido: extracted.lucro_liquido || 25000,
+          receitaBruta: extracted.receita_bruta || null,
+          receitaLiquida: extracted.receita_liquida || null,
+          cmv: extracted.cmv || null,
+          despesasOperacionais: extracted.despesas_operacionais || null,
+          depreciacaoAmortizacao: extracted.depreciacao_amortizacao || null,
+          lucroOperacional: extracted.lucro_operacional || null,
+          lucroLiquido: extracted.lucro_liquido || null,
         },
         balanco: {
-          ...demonstrativos.balanco,
-          ativoTotal: 500000,
-          passivoTotal: 300000,
-          patrimonioLiquido: 200000,
-          ativoCirculante: 180000,
-          passivoCirculante: 90000,
+          ativoCirculante: extracted.ativo_circulante || null,
+          ativoNaoCirculante: extracted.ativo_nao_circulante || null,
+          ativoTotal: extracted.ativo_total || null,
+          passivoCirculante: extracted.passivo_circulante || null,
+          passivoNaoCirculante: extracted.passivo_nao_circulante || null,
+          passivoTotal: extracted.passivo_total || null,
+          patrimonioLiquido: extracted.patrimonio_liquido || null,
+          estoques: extracted.estoques || null,
+          contasAReceber: extracted.contas_a_receber || null,
+          fornecedores: extracted.fornecedores || null,
         },
-        dfc: { ...demonstrativos.dfc },
+        dfc: {
+          fluxoOperacional: extracted.fluxo_operacional || null,
+          fluxoInvestimento: extracted.fluxo_investimento || null,
+          fluxoFinanciamento: extracted.fluxo_financiamento || null,
+          saldoInicial: extracted.saldo_inicial || null,
+          saldoFinal: extracted.saldo_final || null,
+        },
       } as Demonstrativos)
 
       setStep('validation')
@@ -129,7 +176,10 @@ export default function Upload() {
               <p className="text-sm text-slate-500">
                 Formatos suportados: PDF, Excel, CSV (Máx. 25MB)
               </p>
-              <Button className="mt-6 bg-blue-600 hover:bg-blue-700 text-white">
+              <Button
+                className="mt-6 bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={triggerFileInput}
+              >
                 Buscar Arquivo
               </Button>
             </div>

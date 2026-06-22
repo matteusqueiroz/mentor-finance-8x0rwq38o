@@ -155,7 +155,7 @@ export default function Documentos() {
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
         'analyze-document',
         {
-          body: { documentText: `Analisando documento: ${publicUrlData.publicUrl}` },
+          body: { documentUrl: publicUrlData.publicUrl, fileName: file.name, documentId: doc.id },
         },
       )
 
