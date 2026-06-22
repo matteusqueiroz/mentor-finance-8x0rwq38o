@@ -21,6 +21,23 @@ export default function Upload() {
   const { toast } = useToast()
   const [step, setStep] = useState<'upload' | 'processing' | 'validation'>('upload')
   const [isSaving, setIsSaving] = useState(false)
+  const [docId, setDocId] = useState<string | null>(null)
+  const [rawAnalysis, setRawAnalysis] = useState<any>(null)
+  const [empresaData, setEmpresaData] = useState<{
+    faturamento_anual: number | null
+    impostos_mensal: number | null
+    salarios_mensal: number | null
+    aluguel_mensal: number | null
+    outras_despesas_fixas_mensal: number | null
+    despesas_variaveis_mensal: number | null
+  }>({
+    faturamento_anual: null,
+    impostos_mensal: null,
+    salarios_mensal: null,
+    aluguel_mensal: null,
+    outras_despesas_fixas_mensal: null,
+    despesas_variaveis_mensal: null,
+  })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const triggerFileInput = () => {
@@ -80,15 +97,19 @@ export default function Upload() {
         throw analysisError
       }
 
-      await supabase
-        .from('documentos_contabeis')
-        .update({
-          status: 'processado',
-          analise_ia: analysisData?.analysis,
-        })
-        .eq('id', docRecord.id)
+      setDocId(docRecord.id)
+      setRawAnalysis(analysisData?.analysis)
 
       const extracted = analysisData?.analysis?.extracted_data || {}
+
+      setEmpresaData({
+        faturamento_anual: extracted.faturamento_anual || extracted.receita_bruta || null,
+        impostos_mensal: extracted.impostos_mensal || null,
+        salarios_mensal: extracted.salarios_mensal || null,
+        aluguel_mensal: extracted.aluguel_mensal || null,
+        outras_despesas_fixas_mensal: extracted.outras_despesas_fixas_mensal || null,
+        despesas_variaveis_mensal: extracted.despesas_variaveis_mensal || null,
+      })
 
       onboardingActions.preencherDeExtracao({
         dre: {
@@ -139,6 +160,34 @@ export default function Upload() {
     setIsSaving(true)
     try {
       await saveDiagnostico(user.id, 'Empresa (Upload)', demonstrativos)
+
+      const { data: existingEmpresas } = await supabase
+        .from('empresas')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('criado_em', { ascending: false })
+        .limit(1)
+
+      if (existingEmpresas && existingEmpresas.length > 0) {
+        await supabase.from('empresas').update(empresaData).eq('id', existingEmpresas[0].id)
+      } else {
+        await supabase.from('empresas').insert({
+          user_id: user.id,
+          nome_empresa: 'Empresa (Upload)',
+          ...empresaData,
+        })
+      }
+
+      if (docId) {
+        await supabase
+          .from('documentos_contabeis')
+          .update({
+            status: 'processado',
+            analise_ia: { ...rawAnalysis, verified_data: empresaData },
+          })
+          .eq('id', docId)
+      }
+
       onboardingActions.setOrigemConfiabilidade('extraido')
       navigate('/diagnostico')
     } catch (err: any) {
@@ -151,15 +200,19 @@ export default function Upload() {
   return (
     <div className="max-w-3xl mx-auto py-10 px-4 animate-fade-in space-y-8">
       <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-bold text-slate-100">Upload de Documento</h1>
-        <p className="text-slate-400">Deixe a IA extrair os números para você.</p>
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+          Upload de Documento
+        </h1>
+        <p className="text-slate-600 dark:text-slate-400">
+          Deixe a IA extrair os números para você.
+        </p>
       </div>
 
       {step === 'upload' && (
-        <Card className="bg-slate-900 border-slate-800">
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <CardContent className="p-12 flex flex-col items-center text-center">
             <div
-              className="w-full max-w-lg border-2 border-dashed border-slate-700 rounded-2xl p-12 bg-slate-900/50 hover:bg-slate-800 transition-colors cursor-pointer"
+              className="w-full max-w-lg border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-12 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               onClick={triggerFileInput}
             >
               <input
@@ -170,7 +223,7 @@ export default function Upload() {
                 accept=".pdf,.xlsx,.xls,.csv"
               />
               <UploadCloud className="h-16 w-16 text-blue-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-slate-200 mb-2">
+              <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200 mb-2">
                 Clique para fazer upload ou arraste arquivos aqui
               </h3>
               <p className="text-sm text-slate-500">
@@ -188,10 +241,10 @@ export default function Upload() {
       )}
 
       {step === 'processing' && (
-        <Card className="bg-slate-900 border-slate-800">
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <CardContent className="p-20 flex flex-col items-center text-center animate-pulse">
             <FileText className="h-16 w-16 text-blue-500 mb-6" />
-            <h3 className="text-xl font-medium text-slate-200 mb-2">
+            <h3 className="text-xl font-medium text-slate-800 dark:text-slate-200 mb-2">
               A IA está processando seu documento...
             </h3>
             <p className="text-slate-500">
@@ -203,7 +256,7 @@ export default function Upload() {
 
       {step === 'validation' && (
         <div className="space-y-6 animate-slide-up">
-          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 p-4 rounded-xl flex items-start gap-3">
+          <div className="bg-amber-100 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-500/20 text-amber-800 dark:text-amber-400 p-4 rounded-xl flex items-start gap-3">
             <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
             <div>
               <h4 className="font-semibold text-sm">Validação Humana Obrigatória</h4>
@@ -214,44 +267,71 @@ export default function Upload() {
             </div>
           </div>
 
-          <Card className="bg-slate-900 border-slate-800">
+          <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
             <CardHeader>
-              <CardTitle className="text-slate-100">Campos Extraídos</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-slate-900 dark:text-slate-100">Campos Extraídos</CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
                 Revise os principais dados encontrados no documento.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <MoneyField
-                label="Receita Líquida (DRE)"
-                value={demonstrativos.dre.receitaLiquida}
-                onChange={(v) => onboardingActions.atualizarDRE({ receitaLiquida: v })}
+                label="Faturamento Anual"
+                value={empresaData.faturamento_anual}
+                onChange={(v: number | null) =>
+                  setEmpresaData((p) => ({ ...p, faturamento_anual: v }))
+                }
               />
               <MoneyField
-                label="CMV (DRE)"
-                value={demonstrativos.dre.cmv}
-                onChange={(v) => onboardingActions.atualizarDRE({ cmv: v })}
+                label="Impostos (Mensal)"
+                value={empresaData.impostos_mensal}
+                onChange={(v: number | null) =>
+                  setEmpresaData((p) => ({ ...p, impostos_mensal: v }))
+                }
               />
               <MoneyField
-                label="Lucro Líquido (DRE)"
-                value={demonstrativos.dre.lucroLiquido}
-                onChange={(v) => onboardingActions.atualizarDRE({ lucroLiquido: v })}
+                label="Salários (Mensal)"
+                value={empresaData.salarios_mensal}
+                onChange={(v: number | null) =>
+                  setEmpresaData((p) => ({ ...p, salarios_mensal: v }))
+                }
               />
-              <div className="pt-4 border-t border-slate-800 space-y-4">
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-4">
+                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">
+                  Detalhes Operacionais
+                </h4>
                 <MoneyField
-                  label="Ativo Total (Balanço)"
-                  value={demonstrativos.balanco.ativoTotal}
-                  onChange={(v) => onboardingActions.atualizarBalanco({ ativoTotal: v })}
+                  label="Aluguel (Mensal)"
+                  value={empresaData.aluguel_mensal}
+                  onChange={(v: number | null) =>
+                    setEmpresaData((p) => ({ ...p, aluguel_mensal: v }))
+                  }
                 />
                 <MoneyField
-                  label="Passivo Total (Balanço)"
-                  value={demonstrativos.balanco.passivoTotal}
-                  onChange={(v) => onboardingActions.atualizarBalanco({ passivoTotal: v })}
+                  label="Despesas Variáveis (Mensal)"
+                  value={empresaData.despesas_variaveis_mensal}
+                  onChange={(v: number | null) =>
+                    setEmpresaData((p) => ({ ...p, despesas_variaveis_mensal: v }))
+                  }
+                />
+              </div>
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 space-y-4">
+                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">
+                  Demonstrativos (Opcional)
+                </h4>
+                <MoneyField
+                  label="Receita Líquida (DRE)"
+                  value={demonstrativos.dre.receitaLiquida}
+                  onChange={(v: number | null) =>
+                    onboardingActions.atualizarDRE({ receitaLiquida: v })
+                  }
                 />
                 <MoneyField
-                  label="Patrimônio Líquido (Balanço)"
-                  value={demonstrativos.balanco.patrimonioLiquido}
-                  onChange={(v) => onboardingActions.atualizarBalanco({ patrimonioLiquido: v })}
+                  label="Lucro Líquido (DRE)"
+                  value={demonstrativos.dre.lucroLiquido}
+                  onChange={(v: number | null) =>
+                    onboardingActions.atualizarDRE({ lucroLiquido: v })
+                  }
                 />
               </div>
             </CardContent>
@@ -260,7 +340,7 @@ export default function Upload() {
           <div className="flex justify-end gap-4">
             <Button
               variant="outline"
-              className="border-slate-700 text-slate-300 bg-transparent hover:bg-slate-800"
+              className="border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800"
               onClick={() => setStep('upload')}
             >
               Refazer Upload
