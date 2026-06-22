@@ -128,6 +128,50 @@ export type Database = {
           },
         ]
       }
+      documentos_contabeis: {
+        Row: {
+          analise_ia: Json | null
+          criado_em: string
+          empresa_id: string | null
+          id: string
+          nome_arquivo: string
+          status: string | null
+          tipo_documento: string | null
+          url_arquivo: string
+          user_id: string
+        }
+        Insert: {
+          analise_ia?: Json | null
+          criado_em?: string
+          empresa_id?: string | null
+          id?: string
+          nome_arquivo: string
+          status?: string | null
+          tipo_documento?: string | null
+          url_arquivo: string
+          user_id: string
+        }
+        Update: {
+          analise_ia?: Json | null
+          criado_em?: string
+          empresa_id?: string | null
+          id?: string
+          nome_arquivo?: string
+          status?: string | null
+          tipo_documento?: string | null
+          url_arquivo?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'documentos_contabeis_empresa_id_fkey'
+            columns: ['empresa_id']
+            isOneToOne: false
+            referencedRelation: 'empresas'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       empresas: {
         Row: {
           aluguel_mensal: number | null

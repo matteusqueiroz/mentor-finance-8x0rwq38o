@@ -18,7 +18,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Trash2, AlertTriangle, Settings, History, Building, Save } from 'lucide-react'
+import {
+  Trash2,
+  AlertTriangle,
+  Settings,
+  History,
+  Building,
+  Save,
+  Mail,
+  Github,
+  ExternalLink,
+  CheckCircle,
+} from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import { clearUserHistory } from '@/services/db'
@@ -46,27 +57,44 @@ export default function Configuracoes() {
     setor: '',
     regime_tributario: '',
     tipo_clientes: '',
+    email_contabilidade: '',
   })
   const [isSaving, setIsSaving] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isPremium, setIsPremium] = useState(false)
+  const [githubConnected, setGithubConnected] = useState(false)
 
   useEffect(() => {
-    if (!user) return
+    if (!user)
+      return supabase
+        .from('empresas')
+        .select('*')
+        .eq('user_id', user.id)
+        .limit(1)
+        .then(({ data }) => {
+          if (data && data.length > 0) {
+            setEmpresaId(data[0].id)
+            setFormData({
+              nome_empresa: data[0].nome_empresa || '',
+              setor: data[0].setor || '',
+              regime_tributario: data[0].regime_tributario || '',
+              tipo_clientes: data[0].tipo_clientes || '',
+              email_contabilidade: data[0].email_contabilidade || '',
+            })
+          }
+        })
+
+    // Check premium status
     supabase
-      .from('empresas')
-      .select('*')
+      .from('assinaturas')
+      .select('plano')
       .eq('user_id', user.id)
+      .eq('status', 'ativo')
       .limit(1)
       .then(({ data }) => {
         if (data && data.length > 0) {
-          setEmpresaId(data[0].id)
-          setFormData({
-            nome_empresa: data[0].nome_empresa || '',
-            setor: data[0].setor || '',
-            regime_tributario: data[0].regime_tributario || '',
-            tipo_clientes: data[0].tipo_clientes || '',
-          })
+          setIsPremium(data[0].plano === 'premium' || data[0].plano === 'pro')
         }
       })
   }, [user])
@@ -76,6 +104,16 @@ export default function Configuracoes() {
       toast({
         title: 'Validação',
         description: 'O nome da empresa é obrigatório.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (formData.email_contabilidade && !emailRegex.test(formData.email_contabilidade)) {
+      toast({
+        title: 'Validação',
+        description: 'O e-mail da contabilidade é inválido.',
         variant: 'destructive',
       })
       return
@@ -210,6 +248,20 @@ export default function Configuracoes() {
               </Select>
             </div>
           </div>
+          <div className="space-y-2 pt-2 border-t">
+            <Label className="flex items-center gap-2">
+              <Mail className="h-4 w-4" /> E-mail da Contabilidade
+            </Label>
+            <p className="text-sm text-muted-foreground mb-2">
+              Documentos enviados serão encaminhados automaticamente para este e-mail.
+            </p>
+            <Input
+              type="email"
+              value={formData.email_contabilidade}
+              onChange={(e) => setFormData({ ...formData, email_contabilidade: e.target.value })}
+              placeholder="contato@contabilidade.com.br"
+            />
+          </div>
         </CardContent>
         <CardFooter className="bg-muted/30 pt-6">
           <Button
@@ -220,6 +272,79 @@ export default function Configuracoes() {
             <Save className="h-4 w-4 mr-2" /> {isSaving ? 'Salvando...' : 'Salvar Perfil'}
           </Button>
         </CardFooter>
+      </Card>
+
+      <Card className="shadow-sm border-border/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Github className="h-5 w-5 text-primary" /> Integração GitHub
+          </CardTitle>
+          <CardDescription>
+            Conecte seu repositório para sincronizar dados e relatórios diretamente com o GitHub
+            (Funcionalidade Premium).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!isPremium ? (
+            <div className="flex flex-col sm:flex-row items-center gap-4 bg-muted/50 p-4 rounded-lg border">
+              <div className="flex-1">
+                <h4 className="font-medium">Recurso Exclusivo Premium</h4>
+                <p className="text-sm text-muted-foreground">
+                  Faça o upgrade para acessar a integração com repositórios e automatizar seus
+                  relatórios.
+                </p>
+              </div>
+              <Button
+                onClick={() =>
+                  toast({ title: 'Planos', description: 'Abrindo modal de assinatura...' })
+                }
+              >
+                Upgrade para Premium
+              </Button>
+            </div>
+          ) : githubConnected ? (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-green-500/10 border border-green-500/20 p-4 rounded-lg">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+                <div>
+                  <h4 className="font-medium text-green-800 dark:text-green-400">
+                    GitHub Conectado
+                  </h4>
+                  <p className="text-sm text-green-700/80 dark:text-green-400/80">
+                    Repositório: empresa/financeiro-sync
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                className="text-red-600 border-red-200 hover:bg-red-50"
+                onClick={() => setGithubConnected(false)}
+              >
+                Desconectar
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border p-4 rounded-lg">
+              <div>
+                <h4 className="font-medium">Nenhum repositório conectado</h4>
+                <p className="text-sm text-muted-foreground">
+                  Sincronize seus dados com segurança.
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  toast({
+                    title: 'Redirecionando...',
+                    description: 'Abrindo autenticação do GitHub.',
+                  })
+                  setTimeout(() => setGithubConnected(true), 1500)
+                }}
+              >
+                <ExternalLink className="h-4 w-4 mr-2" /> Conectar GitHub
+              </Button>
+            </div>
+          )}
+        </CardContent>
       </Card>
 
       <Card className="border-orange-500/30 bg-orange-500/5">
