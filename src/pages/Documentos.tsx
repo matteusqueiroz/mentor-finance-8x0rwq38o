@@ -65,6 +65,40 @@ export default function Documentos() {
 
   useEffect(() => {
     fetchDocumentos()
+
+    if (!user) return
+
+    // Subscribe to realtime updates for documentos_contabeis
+    const channel = supabase
+      .channel('documentos_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'documentos_contabeis',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setDocumentos((prev) => {
+              if (prev.find((d) => d.id === payload.new.id)) return prev
+              return [payload.new, ...prev]
+            })
+          } else if (payload.eventType === 'UPDATE') {
+            setDocumentos((prev) =>
+              prev.map((d) => (d.id === payload.new.id ? { ...d, ...payload.new } : d)),
+            )
+          } else if (payload.eventType === 'DELETE') {
+            setDocumentos((prev) => prev.filter((d) => d.id !== payload.old.id))
+          }
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [user])
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,8 +146,6 @@ export default function Documentos() {
 
       if (insertError) throw insertError
 
-      // Optimistically update UI
-      setDocumentos((prev) => [doc, ...prev])
       toast({
         title: 'Sucesso',
         description: 'Documento enviado. Iniciando análise...',
@@ -127,43 +159,53 @@ export default function Documentos() {
         },
       )
 
-      if (!analysisError && analysisData?.analysis) {
-        // 4. Update status & analysis
-        const { data: updatedDoc, error: updateError } = await supabase
-          .from('documentos_contabeis')
-          .update({
-            status: 'concluido',
-            analise_ia: analysisData.analysis,
-          })
-          .eq('id', doc.id)
-          .select()
-          .single()
-
-        if (!updateError && updatedDoc) {
-          setDocumentos((prev) => prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d)))
-
-          // 5. Send to Accountant if configured
-          if (emailContabilidade) {
-            await supabase.functions.invoke('send-accounting-email', {
-              body: { record: updatedDoc },
-            })
-            toast({
-              title: 'Processado',
-              description: 'Documento analisado e enviado à contabilidade.',
-            })
-          } else {
-            toast({
-              title: 'Processado',
-              description:
-                'Documento analisado. Configure o e-mail da contabilidade para envio automático.',
-            })
-          }
-        }
+      if (analysisError) {
+        await supabase.from('documentos_contabeis').update({ status: 'erro' }).eq('id', doc.id)
+        throw analysisError
       }
+
+      let finalStatus = 'processado'
+
+      if (emailContabilidade) {
+        // 4. Send to Accountant if configured
+        const { error: sendError } = await supabase.functions.invoke('send-accounting-email', {
+          body: { record: doc },
+        })
+
+        if (sendError) {
+          finalStatus = 'erro_envio'
+          toast({
+            title: 'Aviso',
+            description: 'Documento analisado, mas falhou ao enviar para a contabilidade.',
+            variant: 'destructive',
+          })
+        } else {
+          finalStatus = 'enviado'
+          toast({
+            title: 'Enviado',
+            description: 'Documento analisado e enviado à contabilidade.',
+          })
+        }
+      } else {
+        toast({
+          title: 'Processado',
+          description:
+            'Documento analisado. Configure o e-mail da contabilidade para envio automático.',
+        })
+      }
+
+      // 5. Update final status in DB
+      await supabase
+        .from('documentos_contabeis')
+        .update({
+          status: finalStatus,
+          analise_ia: analysisData?.analysis,
+        })
+        .eq('id', doc.id)
     } catch (error: any) {
       toast({
         title: 'Erro',
-        description: error.message || 'Falha ao fazer upload do documento.',
+        description: error.message || 'Falha ao fazer upload ou processar o documento.',
         variant: 'destructive',
       })
     } finally {
@@ -291,15 +333,42 @@ export default function Documentos() {
                         {new Date(doc.criado_em).toLocaleDateString('pt-BR')}
                       </TableCell>
                       <TableCell>
-                        {doc.status === 'pendente' ? (
+                        {doc.status === 'pendente' && (
                           <Badge
                             variant="secondary"
                             className="flex w-fit items-center gap-1 whitespace-nowrap"
                           >
                             <Clock className="h-3 w-3" /> Processando
                           </Badge>
-                        ) : (
-                          <Badge className="bg-green-500 hover:bg-green-600 flex w-fit items-center gap-1 whitespace-nowrap">
+                        )}
+                        {doc.status === 'processado' && (
+                          <Badge className="bg-blue-500 hover:bg-blue-600 flex w-fit items-center gap-1 whitespace-nowrap text-white">
+                            <CheckCircle className="h-3 w-3" /> Processado
+                          </Badge>
+                        )}
+                        {doc.status === 'enviado' && (
+                          <Badge className="bg-emerald-500 hover:bg-emerald-600 flex w-fit items-center gap-1 whitespace-nowrap text-white">
+                            <CheckCircle className="h-3 w-3" /> Enviado
+                          </Badge>
+                        )}
+                        {doc.status === 'erro' && (
+                          <Badge
+                            variant="destructive"
+                            className="flex w-fit items-center gap-1 whitespace-nowrap"
+                          >
+                            <AlertTriangle className="h-3 w-3" /> Erro na Análise
+                          </Badge>
+                        )}
+                        {doc.status === 'erro_envio' && (
+                          <Badge
+                            variant="destructive"
+                            className="flex w-fit items-center gap-1 whitespace-nowrap"
+                          >
+                            <AlertTriangle className="h-3 w-3" /> Erro no Envio
+                          </Badge>
+                        )}
+                        {doc.status === 'concluido' && (
+                          <Badge className="bg-green-500 hover:bg-green-600 flex w-fit items-center gap-1 whitespace-nowrap text-white">
                             <CheckCircle className="h-3 w-3" /> Concluído
                           </Badge>
                         )}

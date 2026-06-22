@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { UploadCloud, FileText, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import {
 import { useAuth } from '@/hooks/use-auth'
 import { saveDiagnostico } from '@/services/db'
 import { useToast } from '@/hooks/use-toast'
+import { supabase } from '@/lib/supabase/client'
 
 export default function Upload() {
   const { demonstrativos } = useOnboardingStore()
@@ -20,12 +21,48 @@ export default function Upload() {
   const { toast } = useToast()
   const [step, setStep] = useState<'upload' | 'processing' | 'validation'>('upload')
   const [isSaving, setIsSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleUpload = () => {
+  const triggerFileInput = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !user) return
+
     setStep('processing')
-    setTimeout(() => {
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+      const filePath = `${user.id}/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('documentos')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: publicUrlData } = supabase.storage.from('documentos').getPublicUrl(filePath)
+
+      const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
+        'analyze-document',
+        {
+          body: { documentText: `Analisando documento onboarding: ${publicUrlData.publicUrl}` },
+        },
+      )
+
+      if (analysisError) throw analysisError
+
+      const extracted = analysisData?.analysis?.extracted_data || {}
+
       onboardingActions.preencherDeExtracao({
-        dre: { ...demonstrativos.dre, receitaLiquida: 150000, cmv: 60000, lucroLiquido: 25000 },
+        dre: {
+          ...demonstrativos.dre,
+          receitaLiquida: extracted.receita_liquida || 150000,
+          cmv: 60000,
+          lucroLiquido: extracted.lucro_liquido || 25000,
+        },
         balanco: {
           ...demonstrativos.balanco,
           ativoTotal: 500000,
@@ -36,8 +73,18 @@ export default function Upload() {
         },
         dfc: { ...demonstrativos.dfc },
       } as Demonstrativos)
+
       setStep('validation')
-    }, 2500)
+    } catch (err: any) {
+      toast({
+        title: 'Erro',
+        description: err.message || 'Falha ao processar o arquivo.',
+        variant: 'destructive',
+      })
+      setStep('upload')
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
   }
 
   const handleConfirm = async () => {
@@ -66,8 +113,15 @@ export default function Upload() {
           <CardContent className="p-12 flex flex-col items-center text-center">
             <div
               className="w-full max-w-lg border-2 border-dashed border-slate-700 rounded-2xl p-12 bg-slate-900/50 hover:bg-slate-800 transition-colors cursor-pointer"
-              onClick={handleUpload}
+              onClick={triggerFileInput}
             >
+              <input
+                type="file"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".pdf,.xlsx,.xls,.csv"
+              />
               <UploadCloud className="h-16 w-16 text-blue-500 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-slate-200 mb-2">
                 Clique para fazer upload ou arraste arquivos aqui
@@ -76,7 +130,7 @@ export default function Upload() {
                 Formatos suportados: PDF, Excel, CSV (Máx. 25MB)
               </p>
               <Button className="mt-6 bg-blue-600 hover:bg-blue-700 text-white">
-                Selecionar Arquivo
+                Buscar Arquivo
               </Button>
             </div>
           </CardContent>
