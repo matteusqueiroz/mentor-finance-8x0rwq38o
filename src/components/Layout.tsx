@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import {
+  Home,
   LayoutDashboard,
   FileBarChart,
   CheckSquare,
@@ -27,7 +28,8 @@ import { Button } from '@/components/ui/button'
 import { AIFab } from './AIFab'
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Início', href: '/', icon: Home },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Diagnóstico', href: '/diagnostico', icon: FileBarChart },
   { name: 'Plano de Ação', href: '/plano', icon: CheckSquare },
   { name: 'Organização', href: '/organizacao', icon: Wallet },
@@ -42,12 +44,15 @@ export default function Layout() {
       <div className="min-h-screen bg-background flex w-full">
         <Sidebar className="border-r border-border/50">
           <SidebarHeader className="p-4 border-b border-border/50 flex items-center justify-start h-16">
-            <div className="flex items-center gap-2 px-2 text-primary font-bold text-xl tracking-tight">
-              <div className="bg-primary text-primary-foreground p-1.5 rounded-lg">
+            <Link
+              to="/"
+              className="flex items-center gap-2 px-2 text-primary font-bold text-xl tracking-tight hover:opacity-90 transition-opacity"
+            >
+              <div className="bg-primary text-primary-foreground p-1.5 rounded-lg shadow-sm">
                 <LayoutDashboard className="h-5 w-5" />
               </div>
               PME Gestão IA
-            </div>
+            </Link>
           </SidebarHeader>
           <SidebarContent className="p-2">
             <SidebarGroup>

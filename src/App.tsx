@@ -3,6 +3,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import Index from './pages/Index'
+import Dashboard from './pages/Dashboard'
 import Diagnostico from './pages/Diagnostico'
 import PlanoAcao from './pages/PlanoAcao'
 import Organizacao from './pages/Organizacao'
@@ -19,6 +20,7 @@ const App = () => (
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<Index />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/diagnostico" element={<Diagnostico />} />
             <Route path="/plano" element={<PlanoAcao />} />
             <Route path="/organizacao" element={<Organizacao />} />

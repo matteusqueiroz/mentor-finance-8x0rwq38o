@@ -82,6 +82,7 @@ export default function Organizacao() {
                   <TableHead className="w-[100px]">Data</TableHead>
                   <TableHead>Descrição</TableHead>
                   <TableHead>Categoria</TableHead>
+                  <TableHead>Tipo</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead className="w-[120px]">Status</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
@@ -98,6 +99,17 @@ export default function Organizacao() {
                       <Badge variant="secondary" className="bg-muted font-normal text-xs">
                         {tx.category}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {tx.type === 'in' ? (
+                        <span className="text-primary font-medium text-xs bg-primary/10 px-2 py-1 rounded-full">
+                          Entrada
+                        </span>
+                      ) : (
+                        <span className="text-destructive font-medium text-xs bg-destructive/10 px-2 py-1 rounded-full">
+                          Saída
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell
                       className={cn(
@@ -144,7 +156,7 @@ export default function Organizacao() {
                 ))}
                 {filteredTransactions.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                       Nenhuma transação encontrada.
                     </TableCell>
                   </TableRow>

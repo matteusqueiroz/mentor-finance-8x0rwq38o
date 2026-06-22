@@ -30,6 +30,7 @@ import {
   Pie,
   Legend,
 } from 'recharts'
+import useFinanceStore from '@/stores/use-finance-store'
 
 const costsData = [
   { name: 'Fixos', value: 15000 },
@@ -43,6 +44,7 @@ const breakEvenData = [
 ]
 
 export default function Diagnostico() {
+  const { healthScore } = useFinanceStore()
   const [isProcessing, setIsProcessing] = useState(false)
   const [showReport, setShowReport] = useState(true)
 
@@ -133,6 +135,40 @@ export default function Diagnostico() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6 space-y-4 text-foreground/90 leading-relaxed">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 bg-background rounded-xl p-4 border border-border/50 shadow-sm mb-4">
+                  <div className="relative h-28 w-28 flex items-center justify-center shrink-0">
+                    <ChartContainer config={{}} className="h-full w-full absolute inset-0">
+                      <PieChart>
+                        <Pie
+                          data={[{ value: healthScore }, { value: 100 - healthScore }]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={55}
+                          startAngle={90}
+                          endAngle={-270}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          <Cell fill="hsl(var(--primary))" />
+                          <Cell fill="hsl(var(--muted))" />
+                        </Pie>
+                      </PieChart>
+                    </ChartContainer>
+                    <div className="text-center z-10">
+                      <span className="text-2xl font-bold">{healthScore}</span>
+                      <span className="text-xs text-muted-foreground block -mt-1">/100</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 space-y-1 text-center sm:text-left mt-2 sm:mt-0">
+                    <h3 className="font-semibold text-lg text-foreground">Health Score: Bom</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Sua empresa apresenta uma saúde financeira controlada, mas com oportunidades
+                      de otimização nos custos fixos identificadas pela nossa IA.
+                    </p>
+                  </div>
+                </div>
+
                 <p>
                   Olá! Analisei seus últimos 3 meses de movimentação. Sua empresa apresenta uma{' '}
                   <strong>Margem de Lucro de 18%</strong>, o que é ótimo para o seu setor.
