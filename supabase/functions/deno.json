@@ -1,8 +1,8 @@
 {
   "_versions": {
-    "analyze-document": 7,
-    "generate-report": 2,
-    "chat-advisor": 1,
-    "send-accounting-email": 3
+    "analyze-document": 14,
+    "generate-report": 3,
+    "chat-advisor": 2,
+    "send-accounting-email": 4
   }
 }

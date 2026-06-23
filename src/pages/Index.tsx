@@ -1,9 +1,39 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { UploadCloud, Lightbulb, Briefcase, FileSpreadsheet, ArrowRight } from 'lucide-react'
 import { onboardingActions } from '@/stores/use-onboarding-store'
+import { useAuth } from '@/hooks/use-auth'
+import { supabase } from '@/lib/supabase/client'
+import { Button } from '@/components/ui/button'
 
 export default function Index() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [empresa, setEmpresa] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!user) {
+      setLoading(false)
+      return
+    }
+    const fetchEmpresa = async () => {
+      const { data } = await supabase
+        .from('empresas')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('criado_em', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (data) {
+        setEmpresa(data)
+      }
+      setLoading(false)
+    }
+    fetchEmpresa()
+  }, [user])
   const options = [
     {
       id: 'upload',
@@ -53,6 +83,43 @@ export default function Index() {
       borderColor: 'border-purple-500/20',
     },
   ]
+
+  if (loading) {
+    return <div className="flex justify-center items-center min-h-[60vh]">Carregando...</div>
+  }
+
+  if (empresa) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] space-y-6 animate-fade-in text-center px-4">
+        <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mb-4">
+          <Briefcase className="h-8 w-8 text-blue-500" />
+        </div>
+        <h1 className="text-4xl font-bold text-slate-100 tracking-tight">Bem-vindo de volta!</h1>
+        <p className="text-xl text-slate-400">
+          Encontramos dados da sua empresa:{' '}
+          <span className="font-semibold text-slate-200">{empresa.nome_empresa}</span>
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 mt-8">
+          <Button
+            size="lg"
+            onClick={() => navigate('/dashboard')}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            Acessar Meu Dashboard <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => navigate('/onboarding/upload')}
+            className="border-slate-700 hover:bg-slate-800 text-slate-200"
+          >
+            <UploadCloud className="mr-2 h-5 w-5" />
+            Novo Upload de Documento
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8 animate-fade-in flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] max-w-5xl mx-auto py-10 px-4">
