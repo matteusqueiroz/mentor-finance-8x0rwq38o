@@ -59,7 +59,13 @@ export default function Upload() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const triggerFileInput = () => fileInputRef.current?.click()
+  const triggerFileInput = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+    fileInputRef.current?.click()
+  }
 
   const processFile = async (item: FileItem) => {
     try {
@@ -143,9 +149,15 @@ export default function Upload() {
         ),
       )
     } catch (err: any) {
+      let errorMessage = err.message || 'Falha na extração. Verifique o arquivo.'
+      if (errorMessage.includes('Anthropic API error')) {
+        errorMessage = 'Falha na IA: Documento ilegível ou muito complexo.'
+      } else if (errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
+        errorMessage = 'Erro de conexão ou formato não suportado.'
+      }
       setFiles((prev) =>
         prev.map((f) =>
-          f.id === item.id ? { ...f, status: 'error', progress: 0, error: err.message } : f,
+          f.id === item.id ? { ...f, status: 'error', progress: 0, error: errorMessage } : f,
         ),
       )
     }
@@ -195,26 +207,21 @@ export default function Upload() {
       }
     })
 
-    const hasAtivoPassivo =
-      merged.ativo_circulante !== undefined && merged.passivo_circulante !== undefined
-    const CDG = hasAtivoPassivo
-      ? (merged.ativo_circulante || 0) - (merged.passivo_circulante || 0)
-      : null
+    const ativo_circ = merged.ativo_circulante ?? null
+    const passivo_circ = merged.passivo_circulante ?? null
 
-    const hasNIGInputs =
-      merged.ativo_circulante_operacional !== undefined ||
-      merged.contas_a_receber !== undefined ||
-      merged.estoques !== undefined
-    const ativo_circulante_op =
-      merged.ativo_circulante_operacional ?? (merged.contas_a_receber || 0) + (merged.estoques || 0)
-    const passivo_circulante_op =
-      merged.passivo_circulante_operacional ?? (merged.fornecedores || 0)
+    const CDG = ativo_circ !== null && passivo_circ !== null ? ativo_circ - passivo_circ : null
 
-    const NIG = hasNIGInputs ? ativo_circulante_op - passivo_circulante_op : null
+    const ativo_circ_op =
+      merged.ativo_circulante_operacional ?? merged.contas_a_receber ?? merged.estoques ?? null
+    const passivo_circ_op = merged.passivo_circulante_operacional ?? merged.fornecedores ?? null
+
+    const NIG =
+      ativo_circ_op !== null && passivo_circ_op !== null ? ativo_circ_op - passivo_circ_op : null
     const ST = CDG !== null && NIG !== null ? CDG - NIG : null
 
     setEmpresaData({
-      faturamento_anual: merged.receita_bruta ?? merged.faturamento_anual ?? null,
+      faturamento_anual: merged.faturamento_anual ?? merged.receita_bruta ?? null,
       impostos_mensal: merged.impostos_mensal ?? null,
       salarios_mensal: merged.salarios_mensal ?? null,
       aluguel_mensal: merged.aluguel_mensal ?? null,
@@ -337,14 +344,7 @@ export default function Upload() {
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
                 Formatos: PDF, Excel, CSV (Máx. 25MB)
               </p>
-              <Button
-                className="mt-6 font-semibold"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  triggerFileInput()
-                }}
-                type="button"
-              >
+              <Button className="mt-6 font-semibold" onClick={triggerFileInput} type="button">
                 Procurar Arquivos
               </Button>
             </div>
@@ -384,6 +384,9 @@ export default function Upload() {
                             : `${f.progress}%`}
                       </span>
                     </div>
+                    {f.status === 'error' && f.error && (
+                      <p className="text-xs text-red-500 mb-1">{f.error}</p>
+                    )}
                     <Progress
                       value={f.progress}
                       className={cn(

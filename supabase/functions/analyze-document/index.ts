@@ -1,12 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { encodeBase64 } from 'jsr:@std/encoding/base64'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
-}
+import { corsHeaders } from '../_shared/cors.ts'
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -91,12 +85,13 @@ Deno.serve(async (req: Request) => {
       text: `Você é um analista financeiro sênior. Analise este documento contábil/financeiro (DRE, Balanço ou DFC) e extraia os dados solicitados abaixo em formato JSON estrito, sem nenhum texto adicional antes ou depois.
 Importante para o Modelo Fleuriet: Identifique com precisão o "ativo_circulante_operacional" (ex: Contas a Receber, Estoques) e o "passivo_circulante_operacional" (ex: Fornecedores, Impostos/Salários a Pagar).
 Escreva também um "summary" em linguagem de negócios amigável ao empreendedor (sem jargão contábil complexo), resumindo o que o documento representa e se parece saudável.
-Use chaves nulas (null) para campos numéricos não encontrados.
+Use chaves nulas (null) para campos numéricos não encontrados. NÃO invente valores.
 
 Formato esperado do JSON:
 {
   "summary": "string",
   "extracted_data": {
+    "faturamento_anual": number | null,
     "receita_bruta": number | null,
     "receita_liquida": number | null,
     "cmv": number | null,
